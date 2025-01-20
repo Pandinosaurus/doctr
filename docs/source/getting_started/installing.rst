@@ -3,7 +3,7 @@
 Installation
 ************
 
-This library requires `Python <https://www.python.org/downloads/>`_ 3.6 or higher.
+This library requires `Python <https://www.python.org/downloads/>`_ 3.10 or higher.
 
 
 Prerequisites
@@ -14,16 +14,10 @@ Whichever OS you are running, you will need to install at least TensorFlow or Py
 * `TensorFlow 2 <https://www.tensorflow.org/install/>`_
 * `PyTorch <https://pytorch.org/get-started/locally/#start-locally>`_
 
-If you are running another OS than Linux, you will need a few extra dependencies.
+For MacBooks with M1 chip, you will need some additional packages or specific versions:
 
-For MacOS users, you can install them using `Homebrew <https://brew.sh/>`_ as follows:
-
-.. code:: shell
-
-    brew install cairo pango gdk-pixbuf libffi
-
-For Windows users, those dependencies are included in GTK. You can find the latest installer over `here <https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer/releases>`_.
-
+* `TensorFlow 2 Metal Plugin <https://developer.apple.com/metal/tensorflow-plugin/>`_
+* `PyTorch >= 2.0.0 <https://pytorch.org/get-started/locally/#start-locally>`_
 
 Via Python Package
 ==================
@@ -39,32 +33,39 @@ We strive towards reducing framework-specific dependencies to a minimum, but som
 
 .. tabs::
 
-    .. tab:: TensorFlow
-
-        .. code:: bash
-
-            pip install "python-doctr[tf]"
-
     .. tab:: PyTorch
 
         .. code:: bash
 
             pip install "python-doctr[torch]"
-
-
-Via Git
-=======
-
-Install the library in developper mode:
-
-.. tabs::
+            # or with preinstalled packages for visualization & html & contrib module support
+            pip install "python-doctr[torch,viz,html,contrib]"
 
     .. tab:: TensorFlow
 
         .. code:: bash
 
-            git clone https://github.com/mindee/doctr.git
-            pip install -e doctr/.[tf]
+            pip install "python-doctr[tf]"
+            # or with preinstalled packages for visualization & html & contrib module support
+            pip install "python-doctr[tf,viz,html,contib]"
+
+Via Conda (Only for Linux)
+==========================
+
+Install the last stable release of the package using `conda <https://docs.conda.io/en/latest/>`_:
+
+.. code:: bash
+
+    conda config --set channel_priority strict
+    conda install -c techMindee -c pypdfium2-team -c bblanchon -c defaults -c conda-forge python-doctr
+
+
+Via Git
+=======
+
+Install the library in developer mode:
+
+.. tabs::
 
     .. tab:: PyTorch
 
@@ -72,3 +73,10 @@ Install the library in developper mode:
 
             git clone https://github.com/mindee/doctr.git
             pip install -e doctr/.[torch]
+
+    .. tab:: TensorFlow
+
+        .. code:: bash
+
+            git clone https://github.com/mindee/doctr.git
+            pip install -e doctr/.[tf]

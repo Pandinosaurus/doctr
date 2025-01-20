@@ -10,7 +10,7 @@ State-of-the-art Optical Character Recognition made seamless & accessible to any
 
 DocTR provides an easy and powerful way to extract valuable information from your documents:
 
-* |:receipt:| **for automation**: seemlessly process documents for Natural Language Understanding tasks: we provide OCR predictors to parse textual information (localize and identify each word) from your documents.
+* |:receipt:| **for automation**: seamlessly process documents for Natural Language Understanding tasks: we provide OCR predictors to parse textual information (localize and identify each word) from your documents.
 * |:woman_scientist:| **for research**: quickly compare your own architectures speed & performances with state-of-art models on public datasets.
 
 
@@ -19,7 +19,7 @@ Main Features
 
 * |:robot:| Robust 2-stage (detection + recognition) OCR predictors with pretrained parameters
 * |:zap:| User-friendly, 3 lines of code to load a document and extract text with a predictor
-* |:rocket:| State-of-the-art performances on public document datasets, comparable with GoogleVision/AWS Textract
+* |:rocket:| State-of-the-art performance on public document datasets, comparable with GoogleVision/AWS Textract
 * |:zap:| Optimized for inference speed on both CPU & GPU
 * |:bird:| Light package, minimal dependencies
 * |:tools:| Actively maintained by Mindee
@@ -42,12 +42,15 @@ Text detection models
 """""""""""""""""""""
 * DBNet from `"Real-time Scene Text Detection with Differentiable Binarization" <https://arxiv.org/pdf/1911.08947.pdf>`_
 * LinkNet from `"LinkNet: Exploiting Encoder Representations for Efficient Semantic Segmentation" <https://arxiv.org/pdf/1707.03718.pdf>`_
+* FAST from `"FAST: Faster Arbitrarily-Shaped Text Detector with Minimalist Kernel Representation" <https://arxiv.org/pdf/2111.02394.pdf>`_
 
 Text recognition models
 """""""""""""""""""""""
 * SAR from `"Show, Attend and Read: A Simple and Strong Baseline for Irregular Text Recognition" <https://arxiv.org/pdf/1811.00751.pdf>`_
 * CRNN from `"An End-to-End Trainable Neural Network for Image-based Sequence Recognition and Its Application to Scene Text Recognition" <https://arxiv.org/pdf/1507.05717.pdf>`_
 * MASTER from `"MASTER: Multi-Aspect Non-local Network for Scene Text Recognition" <https://arxiv.org/pdf/1910.02562.pdf>`_
+* ViTSTR from `"Vision Transformer for Fast and Efficient Scene Text Recognition" <https://arxiv.org/pdf/2105.08582.pdf>`_
+* PARSeq from `"Scene Text Recognition with Permuted Autoregressive Sequence Models" <https://arxiv.org/pdf/2207.06966>`_
 
 
 Supported datasets
@@ -63,6 +66,8 @@ Supported datasets
 * IC13 from `ICDAR 2013 <http://dagdata.cvc.uab.es/icdar2013competition/>`_.
 * IMGUR5K from `"TextStyleBrush: Transfer of Text Aesthetics from a Single Example" <https://github.com/facebookresearch/IMGUR5K-Handwriting-Dataset>`_.
 * MJSynth from `"Synthetic Data and Artificial Neural Networks for Natural Scene Text Recognition" <https://www.robots.ox.ac.uk/~vgg/data/text/>`_.
+* IIITHWS from `"Generating Synthetic Data for Text Recognition" <https://github.com/kris314/hwnet>`_.
+* WILDRECEIPT from `"Spatial Dual-Modality Graph Reasoning for Key Information Extraction" <https://arxiv.org/pdf/2103.14470v1.pdf>`_.
 
 
 .. toctree::
@@ -71,8 +76,20 @@ Supported datasets
    :hidden:
 
    using_doctr/using_models
+   using_doctr/using_datasets
+   using_doctr/using_contrib_modules
    using_doctr/sharing_models
    using_doctr/using_model_export
+   using_doctr/custom_models_training
+   using_doctr/running_on_aws
+
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Community
+   :hidden:
+
+   community/resources
 
 
 .. toctree::
@@ -80,6 +97,7 @@ Supported datasets
    :caption: Package Reference
    :hidden:
 
+   modules/contrib
    modules/datasets
    modules/io
    modules/models

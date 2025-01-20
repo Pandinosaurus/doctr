@@ -1,11 +1,10 @@
-# Copyright (C) 2021-2022, Mindee.
+# Copyright (C) 2021-2025, Mindee.
 
-# This program is licensed under the Apache License version 2.
-# See LICENSE or go to <https://www.apache.org/licenses/LICENSE-2.0.txt> for full license details.
+# This program is licensed under the Apache License 2.0.
+# See LICENSE or go to <https://opensource.org/licenses/Apache-2.0> for full license details.
 
 # Credits: post-processing adapted from https://github.com/xuannianz/DifferentiableBinarization
 
-from typing import List, Tuple
 
 import cv2
 import numpy as np
@@ -14,7 +13,7 @@ from shapely.geometry import Polygon
 
 from ..core import DetectionPostProcessor
 
-__all__ = ['DBPostProcessor']
+__all__ = ["DBPostProcessor"]
 
 
 class DBPostProcessor(DetectionPostProcessor):
@@ -29,19 +28,15 @@ class DBPostProcessor(DetectionPostProcessor):
         bin_thresh: threshold used to binzarized p_map at inference time
 
     """
+
     def __init__(
         self,
         box_thresh: float = 0.1,
         bin_thresh: float = 0.3,
         assume_straight_pages: bool = True,
     ) -> None:
-
-        super().__init__(
-            box_thresh,
-            bin_thresh,
-            assume_straight_pages
-        )
-        self.unclip_ratio = 1.5 if assume_straight_pages else 2.2
+        super().__init__(box_thresh, bin_thresh, assume_straight_pages)
+        self.unclip_ratio = 1.5
 
     def polygon_to_box(
         self,
@@ -80,11 +75,13 @@ class DBPostProcessor(DetectionPostProcessor):
                     max_size = len(p)
             # We ensure that _points can be correctly casted to a ndarray
             _points = [_points[idx]]
-        expanded_points = np.asarray(_points)  # expand polygon
+        expanded_points: np.ndarray = np.asarray(_points)  # expand polygon
         if len(expanded_points) < 1:
-            return None
-        return cv2.boundingRect(expanded_points) if self.assume_straight_pages else np.roll(
-            cv2.boxPoints(cv2.minAreaRect(expanded_points)), -1, axis=0
+            return None  # type: ignore[return-value]
+        return (
+            cv2.boundingRect(expanded_points)  # type: ignore[return-value]
+            if self.assume_straight_pages
+            else np.roll(cv2.boxPoints(cv2.minAreaRect(expanded_points)), -1, axis=0)
         )
 
     def bitmap_to_boxes(
@@ -92,7 +89,7 @@ class DBPostProcessor(DetectionPostProcessor):
         pred: np.ndarray,
         bitmap: np.ndarray,
     ) -> np.ndarray:
-        """Compute boxes from a bitmap/pred_map
+        """Compute boxes from a bitmap/pred_map: find connected components then filter boxes
 
         Args:
             pred: Pred map from differentiable binarization output
@@ -105,8 +102,8 @@ class DBPostProcessor(DetectionPostProcessor):
                 containing x, y, w, h, score for the box
         """
         height, width = bitmap.shape[:2]
-        min_size_box = 1 + int(height / 512)
-        boxes = []
+        min_size_box = 2
+        boxes: list[np.ndarray | list[float]] = []
         # get contours from connected components on the bitmap
         contours, _ = cv2.findContours(bitmap.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         for contour in contours:
@@ -116,12 +113,12 @@ class DBPostProcessor(DetectionPostProcessor):
             # Compute objectness
             if self.assume_straight_pages:
                 x, y, w, h = cv2.boundingRect(contour)
-                points = np.array([[x, y], [x, y + h], [x + w, y + h], [x + w, y]])
+                points: np.ndarray = np.array([[x, y], [x, y + h], [x + w, y + h], [x + w, y]])
                 score = self.box_score(pred, points, assume_straight_pages=True)
             else:
                 score = self.box_score(pred, contour, assume_straight_pages=False)
 
-            if score < self.box_thresh:   # remove polygons with a weak objectness
+            if score < self.box_thresh:  # remove polygons with a weak objectness
                 continue
 
             if self.assume_straight_pages:
@@ -137,7 +134,7 @@ class DBPostProcessor(DetectionPostProcessor):
                 continue
 
             if self.assume_straight_pages:
-                x, y, w, h = _box  # type: ignore[misc]
+                x, y, w, h = _box
                 # compute relative polygon to get rid of img shape
                 xmin, ymin, xmax, ymax = x / width, y / height, (x + w) / width, (y + h) / height
                 boxes.append([xmin, ymin, xmax, ymax, score])
@@ -147,10 +144,11 @@ class DBPostProcessor(DetectionPostProcessor):
                     raise AssertionError("When assume straight pages is false a box is a (4, 2) array (polygon)")
                 _box[:, 0] /= width
                 _box[:, 1] /= height
-                boxes.append(_box)
+                # Add score to box as (0, score)
+                boxes.append(np.vstack([_box, np.array([0.0, score])]))
 
         if not self.assume_straight_pages:
-            return np.clip(np.asarray(boxes), 0, 1) if len(boxes) > 0 else np.zeros((0, 4, 2), dtype=pred.dtype)
+            return np.clip(np.asarray(boxes), 0, 1) if len(boxes) > 0 else np.zeros((0, 5, 2), dtype=pred.dtype)
         else:
             return np.clip(np.asarray(boxes), 0, 1) if len(boxes) > 0 else np.zeros((0, 5), dtype=pred.dtype)
 
@@ -172,11 +170,11 @@ class _DBNet:
 
     @staticmethod
     def compute_distance(
-        xs: np.array,
-        ys: np.array,
-        a: np.array,
-        b: np.array,
-        eps: float = 1e-7,
+        xs: np.ndarray,
+        ys: np.ndarray,
+        a: np.ndarray,
+        b: np.ndarray,
+        eps: float = 1e-6,
     ) -> float:
         """Compute the distance for each point of the map (xs, ys) to the (a, b) segment
 
@@ -185,6 +183,7 @@ class _DBNet:
             ys : map of y coordinates (height, width)
             a: first point defining the [ab] segment
             b: second point defining the [ab] segment
+            eps: epsilon to avoid division by zero
 
         Returns:
             The computed distance
@@ -194,18 +193,19 @@ class _DBNet:
         square_dist_2 = np.square(xs - b[0]) + np.square(ys - b[1])
         square_dist = np.square(a[0] - b[0]) + np.square(a[1] - b[1])
         cosin = (square_dist - square_dist_1 - square_dist_2) / (2 * np.sqrt(square_dist_1 * square_dist_2) + eps)
+        cosin = np.clip(cosin, -1.0, 1.0)
         square_sin = 1 - np.square(cosin)
         square_sin = np.nan_to_num(square_sin)
-        result = np.sqrt(square_dist_1 * square_dist_2 * square_sin / square_dist)
+        result = np.sqrt(square_dist_1 * square_dist_2 * square_sin / square_dist + eps)
         result[cosin < 0] = np.sqrt(np.fmin(square_dist_1, square_dist_2))[cosin < 0]
         return result
 
     def draw_thresh_map(
         self,
-        polygon: np.array,
-        canvas: np.array,
-        mask: np.array,
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        polygon: np.ndarray,
+        canvas: np.ndarray,
+        mask: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Draw a polygon treshold map on a canvas, as described in the DB paper
 
         Args:
@@ -222,10 +222,10 @@ class _DBNet:
         subject = [tuple(coor) for coor in polygon]  # Get coord as list of tuples
         padding = pyclipper.PyclipperOffset()
         padding.AddPath(subject, pyclipper.JT_ROUND, pyclipper.ET_CLOSEDPOLYGON)
-        padded_polygon = np.array(padding.Execute(distance)[0])
+        padded_polygon: np.ndarray = np.array(padding.Execute(distance)[0])
 
         # Fill the mask with 1 on the new padded polygon
-        cv2.fillPoly(mask, [padded_polygon.astype(np.int32)], 1.0)
+        cv2.fillPoly(mask, [padded_polygon.astype(np.int32)], 1.0)  # type: ignore[call-overload]
 
         # Get min/max to recover polygon after distance computation
         xmin = padded_polygon[:, 0].min()
@@ -238,8 +238,8 @@ class _DBNet:
         polygon[:, 0] = polygon[:, 0] - xmin
         polygon[:, 1] = polygon[:, 1] - ymin
         # Get absolute padded polygon
-        xs = np.broadcast_to(np.linspace(0, width - 1, num=width).reshape(1, width), (height, width))
-        ys = np.broadcast_to(np.linspace(0, height - 1, num=height).reshape(height, 1), (height, width))
+        xs: np.ndarray = np.broadcast_to(np.linspace(0, width - 1, num=width).reshape(1, width), (height, width))
+        ys: np.ndarray = np.broadcast_to(np.linspace(0, height - 1, num=height).reshape(height, 1), (height, width))
 
         # Compute distance map to fill the padded polygon
         distance_map = np.zeros((polygon.shape[0], height, width), dtype=polygon.dtype)
@@ -256,87 +256,105 @@ class _DBNet:
         ymax_valid = min(max(0, ymax), canvas.shape[0] - 1)
 
         # Fill the canvas with the distances computed inside the valid padded polygon
-        canvas[ymin_valid:ymax_valid + 1, xmin_valid:xmax_valid + 1] = np.fmax(
-            1 - distance_map[
-                ymin_valid - ymin:ymax_valid - ymin + 1,
-                xmin_valid - xmin:xmax_valid - xmin + 1
+        canvas[ymin_valid : ymax_valid + 1, xmin_valid : xmax_valid + 1] = np.fmax(
+            1
+            - distance_map[
+                ymin_valid - ymin : ymax_valid - ymax + height, xmin_valid - xmin : xmax_valid - xmax + width
             ],
-            canvas[ymin_valid:ymax_valid + 1, xmin_valid:xmax_valid + 1]
+            canvas[ymin_valid : ymax_valid + 1, xmin_valid : xmax_valid + 1],
         )
 
         return polygon, canvas, mask
 
     def build_target(
         self,
-        target: List[np.ndarray],
-        output_shape: Tuple[int, int, int],
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-
-        if any(t.dtype != np.float32 for t in target):
+        target: list[dict[str, np.ndarray]],
+        output_shape: tuple[int, int, int],
+        channels_last: bool = True,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        if any(t.dtype != np.float32 for tgt in target for t in tgt.values()):
             raise AssertionError("the expected dtype of target 'boxes' entry is 'np.float32'.")
-        if any(np.any((t[:, :4] > 1) | (t[:, :4] < 0)) for t in target):
+        if any(np.any((t[:, :4] > 1) | (t[:, :4] < 0)) for tgt in target for t in tgt.values()):
             raise ValueError("the 'boxes' entry of the target is expected to take values between 0 & 1.")
 
-        input_dtype = target[0].dtype if len(target) > 0 else np.float32
+        input_dtype = next(iter(target[0].values())).dtype if len(target) > 0 else np.float32
 
-        seg_target = np.zeros(output_shape, dtype=np.uint8)
-        seg_mask = np.ones(output_shape, dtype=bool)
-        thresh_target = np.zeros(output_shape, dtype=np.float32)
-        thresh_mask = np.ones(output_shape, dtype=np.uint8)
+        h: int
+        w: int
+        if channels_last:
+            h, w, num_classes = output_shape
+        else:
+            num_classes, h, w = output_shape
+        target_shape = (len(target), num_classes, h, w)
 
-        for idx, _target in enumerate(target):
-            # Draw each polygon on gt
-            if _target.shape[0] == 0:
-                # Empty image, full masked
-                seg_mask[idx] = False
+        seg_target: np.ndarray = np.zeros(target_shape, dtype=np.uint8)
+        seg_mask: np.ndarray = np.ones(target_shape, dtype=bool)
+        thresh_target: np.ndarray = np.zeros(target_shape, dtype=np.float32)
+        thresh_mask: np.ndarray = np.zeros(target_shape, dtype=np.uint8)
 
-            # Absolute bounding boxes
-            abs_boxes = _target.copy()
-            if abs_boxes.ndim == 3:
-                abs_boxes[:, :, 0] *= output_shape[-1]
-                abs_boxes[:, :, 1] *= output_shape[-2]
-                polys = abs_boxes
-                boxes_size = np.linalg.norm(abs_boxes[:, 2, :] - abs_boxes[:, 0, :], axis=-1)
-                abs_boxes = np.concatenate((abs_boxes.min(1), abs_boxes.max(1)), -1).round().astype(np.int32)
-            else:
-                abs_boxes[:, [0, 2]] *= output_shape[-1]
-                abs_boxes[:, [1, 3]] *= output_shape[-2]
-                abs_boxes = abs_boxes.round().astype(np.int32)
-                polys = np.stack([
-                    abs_boxes[:, [0, 1]],
-                    abs_boxes[:, [0, 3]],
-                    abs_boxes[:, [2, 3]],
-                    abs_boxes[:, [2, 1]],
-                ], axis=1)
-                boxes_size = np.minimum(abs_boxes[:, 2] - abs_boxes[:, 0], abs_boxes[:, 3] - abs_boxes[:, 1])
+        for idx, tgt in enumerate(target):
+            for class_idx, _tgt in enumerate(tgt.values()):
+                # Draw each polygon on gt
+                if _tgt.shape[0] == 0:
+                    # Empty image, full masked
+                    seg_mask[idx, class_idx] = False
 
-            for box, box_size, poly in zip(abs_boxes, boxes_size, polys):
-                # Mask boxes that are too small
-                if box_size < self.min_size_box:
-                    seg_mask[idx, box[1]: box[3] + 1, box[0]: box[2] + 1] = False
-                    continue
+                # Absolute bounding boxes
+                abs_boxes = _tgt.copy()
+                if abs_boxes.ndim == 3:
+                    abs_boxes[:, :, 0] *= w
+                    abs_boxes[:, :, 1] *= h
+                    polys = abs_boxes
+                    boxes_size = np.linalg.norm(abs_boxes[:, 2, :] - abs_boxes[:, 0, :], axis=-1)
+                    abs_boxes = np.concatenate((abs_boxes.min(1), abs_boxes.max(1)), -1).round().astype(np.int32)
+                else:
+                    abs_boxes[:, [0, 2]] *= w
+                    abs_boxes[:, [1, 3]] *= h
+                    abs_boxes = abs_boxes.round().astype(np.int32)
+                    polys = np.stack(
+                        [
+                            abs_boxes[:, [0, 1]],
+                            abs_boxes[:, [0, 3]],
+                            abs_boxes[:, [2, 3]],
+                            abs_boxes[:, [2, 1]],
+                        ],
+                        axis=1,
+                    )
+                    boxes_size = np.minimum(abs_boxes[:, 2] - abs_boxes[:, 0], abs_boxes[:, 3] - abs_boxes[:, 1])
 
-                # Negative shrink for gt, as described in paper
-                polygon = Polygon(poly)
-                distance = polygon.area * (1 - np.power(self.shrink_ratio, 2)) / polygon.length
-                subject = [tuple(coor) for coor in poly]
-                padding = pyclipper.PyclipperOffset()
-                padding.AddPath(subject, pyclipper.JT_ROUND, pyclipper.ET_CLOSEDPOLYGON)
-                shrinked = padding.Execute(-distance)
+                for poly, box, box_size in zip(polys, abs_boxes, boxes_size):
+                    # Mask boxes that are too small
+                    if box_size < self.min_size_box:
+                        seg_mask[idx, class_idx, box[1] : box[3] + 1, box[0] : box[2] + 1] = False
+                        continue
 
-                # Draw polygon on gt if it is valid
-                if len(shrinked) == 0:
-                    seg_mask[idx, box[1]: box[3] + 1, box[0]: box[2] + 1] = False
-                    continue
-                shrinked = np.array(shrinked[0]).reshape(-1, 2)
-                if shrinked.shape[0] <= 2 or not Polygon(shrinked).is_valid:
-                    seg_mask[idx, box[1]: box[3] + 1, box[0]: box[2] + 1] = False
-                    continue
-                cv2.fillPoly(seg_target[idx], [shrinked.astype(np.int32)], 1)
+                    # Negative shrink for gt, as described in paper
+                    polygon = Polygon(poly)
+                    distance = polygon.area * (1 - np.power(self.shrink_ratio, 2)) / polygon.length
+                    subject = [tuple(coor) for coor in poly]
+                    padding = pyclipper.PyclipperOffset()
+                    padding.AddPath(subject, pyclipper.JT_ROUND, pyclipper.ET_CLOSEDPOLYGON)
+                    shrunken = padding.Execute(-distance)
 
-                # Draw on both thresh map and thresh mask
-                poly, thresh_target[idx], thresh_mask[idx] = self.draw_thresh_map(poly, thresh_target[idx],
-                                                                                  thresh_mask[idx])
+                    # Draw polygon on gt if it is valid
+                    if len(shrunken) == 0:
+                        seg_mask[idx, class_idx, box[1] : box[3] + 1, box[0] : box[2] + 1] = False
+                        continue
+                    shrunken = np.array(shrunken[0]).reshape(-1, 2)
+                    if shrunken.shape[0] <= 2 or not Polygon(shrunken).is_valid:
+                        seg_mask[idx, class_idx, box[1] : box[3] + 1, box[0] : box[2] + 1] = False
+                        continue
+                    cv2.fillPoly(seg_target[idx, class_idx], [shrunken.astype(np.int32)], 1.0)  # type: ignore[call-overload]
+
+                    # Draw on both thresh map and thresh mask
+                    poly, thresh_target[idx, class_idx], thresh_mask[idx, class_idx] = self.draw_thresh_map(
+                        poly, thresh_target[idx, class_idx], thresh_mask[idx, class_idx]
+                    )
+        if channels_last:
+            seg_target = seg_target.transpose((0, 2, 3, 1))
+            seg_mask = seg_mask.transpose((0, 2, 3, 1))
+            thresh_target = thresh_target.transpose((0, 2, 3, 1))
+            thresh_mask = thresh_mask.transpose((0, 2, 3, 1))
 
         thresh_target = thresh_target.astype(input_dtype) * (self.thresh_max - self.thresh_min) + self.thresh_min
 

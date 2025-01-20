@@ -1,13 +1,14 @@
-# Copyright (C) 2021-2022, Mindee.
+# Copyright (C) 2021-2025, Mindee.
 
-# This program is licensed under the Apache License version 2.
-# See LICENSE or go to <https://www.apache.org/licenses/LICENSE-2.0.txt> for full license details.
+# This program is licensed under the Apache License 2.0.
+# See LICENSE or go to <https://opensource.org/licenses/Apache-2.0> for full license details.
 
 import logging
-import os
-from typing import Any, Callable, List, Optional, Union
-from zipfile import ZipFile
+from collections.abc import Callable
+from typing import Any
 
+import tensorflow as tf
+import tf2onnx
 from tensorflow.keras import Model, layers
 
 from doctr.utils.data import download_from_url
@@ -15,53 +16,70 @@ from doctr.utils.data import download_from_url
 logging.getLogger("tensorflow").setLevel(logging.DEBUG)
 
 
-__all__ = ['load_pretrained_params', 'conv_sequence', 'IntermediateLayerGetter']
+__all__ = [
+    "load_pretrained_params",
+    "_build_model",
+    "conv_sequence",
+    "IntermediateLayerGetter",
+    "export_model_to_onnx",
+    "_copy_tensor",
+    "_bf16_to_float32",
+]
+
+
+def _copy_tensor(x: tf.Tensor) -> tf.Tensor:
+    return tf.identity(x)
+
+
+def _bf16_to_float32(x: tf.Tensor) -> tf.Tensor:
+    # Convert bfloat16 to float32 for numpy compatibility
+    return tf.cast(x, tf.float32) if x.dtype == tf.bfloat16 else x
+
+
+def _build_model(model: Model):
+    """Build a model by calling it once with dummy input
+
+    Args:
+        model: the model to be built
+    """
+    model(tf.zeros((1, *model.cfg["input_shape"])), training=False)
 
 
 def load_pretrained_params(
     model: Model,
-    url: Optional[str] = None,
-    hash_prefix: Optional[str] = None,
-    overwrite: bool = False,
-    internal_name: str = 'weights',
+    url: str | None = None,
+    hash_prefix: str | None = None,
+    skip_mismatch: bool = False,
     **kwargs: Any,
 ) -> None:
     """Load a set of parameters onto a model
 
     >>> from doctr.models import load_pretrained_params
-    >>> load_pretrained_params(model, "https://yoursource.com/yourcheckpoint-yourhash.zip")
+    >>> load_pretrained_params(model, "https://yoursource.com/yourcheckpoint-yourhash.weights.h5")
 
     Args:
         model: the keras model to be loaded
         url: URL of the zipped set of parameters
         hash_prefix: first characters of SHA256 expected hash
-        overwrite: should the zip extraction be enforced if the archive has already been extracted
-        internal_name: name of the ckpt files
+        skip_mismatch: skip loading layers with mismatched shapes
+        **kwargs: additional arguments to be passed to `doctr.utils.data.download_from_url`
     """
-
     if url is None:
         logging.warning("Invalid model URL, using default initialization.")
     else:
-        archive_path = download_from_url(url, hash_prefix=hash_prefix, cache_subdir='models', **kwargs)
-
-        # Unzip the archive
-        params_path = archive_path.parent.joinpath(archive_path.stem)
-        if not params_path.is_dir() or overwrite:
-            with ZipFile(archive_path, 'r') as f:
-                f.extractall(path=params_path)
-
+        archive_path = download_from_url(url, hash_prefix=hash_prefix, cache_subdir="models", **kwargs)
         # Load weights
-        model.load_weights(f"{params_path}{os.sep}{internal_name}")
+        model.load_weights(archive_path, skip_mismatch=skip_mismatch)
 
 
 def conv_sequence(
     out_channels: int,
-    activation: Union[str, Callable] = None,
+    activation: str | Callable | None = None,
     bn: bool = False,
-    padding: str = 'same',
-    kernel_initializer: str = 'he_normal',
+    padding: str = "same",
+    kernel_initializer: str = "he_normal",
     **kwargs: Any,
-) -> List[layers.Layer]:
+) -> list[layers.Layer]:
     """Builds a convolutional-based layer sequence
 
     >>> from tensorflow.keras import Sequential
@@ -74,17 +92,16 @@ def conv_sequence(
         bn: should a batch normalization layer be added
         padding: padding scheme
         kernel_initializer: kernel initializer
+        **kwargs: additional arguments to be passed to the convolutional layer
 
     Returns:
         list of layers
     """
     # No bias before Batch norm
-    kwargs['use_bias'] = kwargs.get('use_bias', not(bn))
+    kwargs["use_bias"] = kwargs.get("use_bias", not bn)
     # Add activation directly to the conv if there is no BN
-    kwargs['activation'] = activation if not bn else None
-    conv_seq = [
-        layers.Conv2D(out_channels, padding=padding, kernel_initializer=kernel_initializer, **kwargs)
-    ]
+    kwargs["activation"] = activation if not bn else None
+    conv_seq = [layers.Conv2D(out_channels, padding=padding, kernel_initializer=kernel_initializer, **kwargs)]
 
     if bn:
         conv_seq.append(layers.BatchNormalization())
@@ -108,13 +125,58 @@ class IntermediateLayerGetter(Model):
         model: the model to extract feature maps from
         layer_names: the list of layers to retrieve the feature map from
     """
-    def __init__(
-        self,
-        model: Model,
-        layer_names: List[str]
-    ) -> None:
+
+    def __init__(self, model: Model, layer_names: list[str]) -> None:
         intermediate_fmaps = [model.get_layer(layer_name).get_output_at(0) for layer_name in layer_names]
         super().__init__(model.input, outputs=intermediate_fmaps)
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}()"
+
+
+def export_model_to_onnx(
+    model: Model, model_name: str, dummy_input: list[tf.TensorSpec], **kwargs: Any
+) -> tuple[str, list[str]]:
+    """Export model to ONNX format.
+
+    >>> import tensorflow as tf
+    >>> from doctr.models.classification import resnet18
+    >>> from doctr.models.utils import export_classification_model_to_onnx
+    >>> model = resnet18(pretrained=True, include_top=True)
+    >>> export_model_to_onnx(model, "my_model",
+    >>> dummy_input=[tf.TensorSpec([None, 32, 32, 3], tf.float32, name="input")])
+
+    Args:
+        model: the keras model to be exported
+        model_name: the name for the exported model
+        dummy_input: the dummy input to the model
+        kwargs: additional arguments to be passed to tf2onnx
+
+    Returns:
+        the path to the exported model and a list with the output layer names
+    """
+    # get the users eager mode
+    eager_mode = tf.executing_eagerly()
+    # set eager mode to true to avoid issues with tf2onnx
+    tf.config.run_functions_eagerly(True)
+    large_model = kwargs.get("large_model", False)
+    model_proto, _ = tf2onnx.convert.from_keras(
+        model,
+        input_signature=dummy_input,
+        output_path=f"{model_name}.zip" if large_model else f"{model_name}.onnx",
+        **kwargs,
+    )
+    # Get the output layer names
+    output = [n.name for n in model_proto.graph.output]
+
+    # reset the eager mode to the users mode
+    tf.config.run_functions_eagerly(eager_mode)
+
+    # models which are too large (weights > 2GB while converting to ONNX) needs to be handled
+    # about an external tensor storage where the graph and weights are seperatly stored in a archive
+    if large_model:
+        logging.info(f"Model exported to {model_name}.zip")
+        return f"{model_name}.zip", output
+
+    logging.info(f"Model exported to {model_name}.zip")
+    return f"{model_name}.onnx", output

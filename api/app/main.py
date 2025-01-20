@@ -1,14 +1,15 @@
-# Copyright (C) 2021-2022, Mindee.
+# Copyright (C) 2021-2025, Mindee.
 
-# This program is licensed under the Apache License version 2.
-# See LICENSE or go to <https://www.apache.org/licenses/LICENSE-2.0.txt> for full license details.
+# This program is licensed under the Apache License 2.0.
+# See LICENSE or go to <https://opensource.org/licenses/Apache-2.0> for full license details.
 
 import time
 
-from app import config as cfg
-from app.routes import detection, ocr, recognition
 from fastapi import FastAPI, Request
 from fastapi.openapi.utils import get_openapi
+
+from app import config as cfg
+from app.routes import detection, kie, ocr, recognition
 
 app = FastAPI(title=cfg.PROJECT_NAME, description=cfg.PROJECT_DESCRIPTION, debug=cfg.DEBUG, version=cfg.VERSION)
 
@@ -17,6 +18,7 @@ app = FastAPI(title=cfg.PROJECT_NAME, description=cfg.PROJECT_DESCRIPTION, debug
 app.include_router(recognition.router, prefix="/recognition", tags=["recognition"])
 app.include_router(detection.router, prefix="/detection", tags=["detection"])
 app.include_router(ocr.router, prefix="/ocr", tags=["ocr"])
+app.include_router(kie.router, prefix="/kie", tags=["kie"])
 
 
 # Middleware

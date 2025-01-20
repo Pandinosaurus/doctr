@@ -1,12 +1,12 @@
-# Copyright (C) 2021-2022, Mindee.
+# Copyright (C) 2021-2025, Mindee.
 
-# This program is licensed under the Apache License version 2.
-# See LICENSE or go to <https://www.apache.org/licenses/LICENSE-2.0.txt> for full license details.
+# This program is licensed under the Apache License 2.0.
+# See LICENSE or go to <https://opensource.org/licenses/Apache-2.0> for full license details.
 
 from torch import Tensor
 from torch.nn.functional import max_pool2d
 
-__all__ = ['erode', 'dilate']
+__all__ = ["erode", "dilate"]
 
 
 def erode(x: Tensor, kernel_size: int) -> Tensor:
@@ -15,6 +15,7 @@ def erode(x: Tensor, kernel_size: int) -> Tensor:
     Args:
         x: boolean tensor of shape (N, C, H, W)
         kernel_size: the size of the kernel to use for erosion
+
     Returns:
         the eroded tensor
     """
@@ -29,6 +30,7 @@ def dilate(x: Tensor, kernel_size: int) -> Tensor:
     Args:
         x: boolean tensor of shape (N, C, H, W)
         kernel_size: the size of the kernel to use for dilation
+
     Returns:
         the dilated tensor
     """

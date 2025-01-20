@@ -1,5 +1,3 @@
-from typing import List, Tuple
-
 import tensorflow as tf
 
 from doctr.datasets import DataLoader
@@ -7,8 +5,7 @@ from doctr.datasets import DataLoader
 
 class MockDataset:
     def __init__(self, input_size):
-
-        self.data: List[Tuple[float, bool]] = [
+        self.data: list[tuple[float, bool]] = [
             (1, True),
             (0, False),
             (0.5, True),
@@ -24,7 +21,6 @@ class MockDataset:
 
 
 class MockDatasetBis(MockDataset):
-
     @staticmethod
     def collate_fn(samples):
         x, y = zip(*samples)
@@ -32,7 +28,6 @@ class MockDatasetBis(MockDataset):
 
 
 def test_dataloader():
-
     loader = DataLoader(
         MockDataset((32, 32)),
         shuffle=True,

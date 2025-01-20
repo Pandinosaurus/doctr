@@ -10,24 +10,9 @@ To make it easy for you, we have integrated a interface to the huggingface hub.
 Loading from Huggingface Hub
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-This section shows you how you can easily load a pretrained model from the Huggingface Hub.
+This section shows how you can easily load a pretrained model from the Huggingface Hub.
 
 .. tabs::
-
-    .. tab:: TensorFlow
-
-        .. code:: python3
-
-            from doctr.io import DocumentFile
-            from doctr.models import ocr_predictor, from_hub
-            image = DocumentFile.from_images(['data/example.jpg'])
-            # Load a custom detection model from huggingface hub
-            det_model = from_hub('Felix92/doctr-tf-db-resnet50')
-            # Load a custom recognition model from huggingface hub
-            reco_model = from_hub('Felix92/doctr-tf-crnn-vgg16-bn-french')
-            # You can easily plug in this models to the OCR predictor
-            predictor = ocr_predictor(det_arch=det_model, reco_arch=reco_model)
-            result = predictor(image)
 
     .. tab:: PyTorch
 
@@ -40,6 +25,21 @@ This section shows you how you can easily load a pretrained model from the Huggi
             det_model = from_hub('Felix92/doctr-torch-db-mobilenet-v3-large')
             # Load a custom recognition model from huggingface hub
             reco_model = from_hub('Felix92/doctr-torch-crnn-mobilenet-v3-large-french')
+            # You can easily plug in this models to the OCR predictor
+            predictor = ocr_predictor(det_arch=det_model, reco_arch=reco_model)
+            result = predictor(image)
+
+    .. tab:: TensorFlow
+
+        .. code:: python3
+
+            from doctr.io import DocumentFile
+            from doctr.models import ocr_predictor, from_hub
+            image = DocumentFile.from_images(['data/example.jpg'])
+            # Load a custom detection model from huggingface hub
+            det_model = from_hub('Felix92/doctr-tf-db-resnet50')
+            # Load a custom recognition model from huggingface hub
+            reco_model = from_hub('Felix92/doctr-tf-crnn-vgg16-bn-french')
             # You can easily plug in this models to the OCR predictor
             predictor = ocr_predictor(det_arch=det_model, reco_arch=reco_model)
             result = predictor(image)
@@ -67,23 +67,39 @@ It is also possible to push your model directly after training.
 
 .. tabs::
 
-    .. tab:: TensorFlow
-
-        python3 ~/doctr/references/recognition/train_tensorflow.py crnn_mobilenet_v3_large --name doctr-crnn-mobilenet-v3-large --push-to-hub
-
     .. tab:: PyTorch
 
-        python3 ~/doctr/references/recognition/train_pytorch.py crnn_mobilenet_v3_large --name doctr-crnn-mobilenet-v3-large --push-to-hub
+        .. code:: bash
+
+            python3 ~/doctr/references/recognition/train_pytorch.py crnn_mobilenet_v3_large --name doctr-crnn-mobilenet-v3-large --push-to-hub
+
+    .. tab:: TensorFlow
+
+        .. code:: bash
+
+            python3 ~/doctr/references/recognition/train_tensorflow.py crnn_mobilenet_v3_large --name doctr-crnn-mobilenet-v3-large --push-to-hub
 
 
 Pretrained community models
----------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 This section is to provide some tables for pretrained community models.
 Feel free to open a pull request or issue to add your model to this list.
 
+Naming conventions
+------------------
+
+We suggest using the following naming conventions for your models:
+
+**Classification:** ``doctr-<architecture>-<vocab>``
+
+**Detection:** ``doctr-<architecture>``
+
+**Recognition:** ``doctr-<architecture>-<vocab>``
+
+
 Classification
-^^^^^^^^^^^^^^
+--------------
 
 +---------------------------------+-------------------------------------+-----------------------+------------------------+
 |        **Architecture**         |            **Repo_ID**              |     **Vocabulary**    |     **Framework**      |
@@ -95,7 +111,7 @@ Classification
 
 
 Detection
-^^^^^^^^^
+---------
 
 +---------------------------------+-------------------------------------------------+------------------------+
 |        **Architecture**         |            **Repo_ID**                          |     **Framework**      |
@@ -107,7 +123,7 @@ Detection
 
 
 Recognition
-^^^^^^^^^^^
+-----------
 
 +---------------------------------+---------------------------------------------------+---------------------+------------------------+
 |        **Architecture**         |            **Repo_ID**                            |     **Language**    |     **Framework**      |
@@ -115,4 +131,8 @@ Recognition
 | crnn_mobilenet_v3_large (dummy) | Felix92/doctr-torch-crnn-mobilenet-v3-large       | french              | PyTorch                |
 +---------------------------------+---------------------------------------------------+---------------------+------------------------+
 | crnn_vgg16_bn (dummy)           | Felix92/doctr-tf-crnn-vgg16-bn-french             | french              | TensorFlow             |
++---------------------------------+---------------------------------------------------+---------------------+------------------------+
+| crnn_vgg16_bn                   | tilman-rassy/doctr-crnn-vgg16-bn-fascan-v1        | french + german + § | PyTorch                |
++---------------------------------+---------------------------------------------------+---------------------+------------------------+
+| parseq                          | Felix92/doctr-torch-parseq-multilingual-v1        | multilingual        | PyTorch                |
 +---------------------------------+---------------------------------------------------+---------------------+------------------------+

@@ -1,10 +1,11 @@
-# Copyright (C) 2021-2022, Mindee.
+# Copyright (C) 2021-2025, Mindee.
 
-# This program is licensed under the Apache License version 2.
-# See LICENSE or go to <https://www.apache.org/licenses/LICENSE-2.0.txt> for full license details.
+# This program is licensed under the Apache License 2.0.
+# See LICENSE or go to <https://opensource.org/licenses/Apache-2.0> for full license details.
 
+from collections.abc import Callable
 from copy import deepcopy
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any
 
 import tensorflow as tf
 from tensorflow.keras import layers
@@ -13,52 +14,51 @@ from tensorflow.keras.models import Sequential
 
 from doctr.datasets import VOCABS
 
-from ...utils import conv_sequence, load_pretrained_params
+from ...utils import _build_model, conv_sequence, load_pretrained_params
 
-__all__ = ['ResNet', 'resnet18', 'resnet31', 'resnet34', 'resnet50', 'resnet34_wide']
+__all__ = ["ResNet", "resnet18", "resnet31", "resnet34", "resnet50", "resnet34_wide"]
 
 
-default_cfgs: Dict[str, Dict[str, Any]] = {
-    'resnet18': {
-        'mean': (0.694, 0.695, 0.693),
-        'std': (0.299, 0.296, 0.301),
-        'input_shape': (32, 32, 3),
-        'classes': list(VOCABS['french']),
-        'url': 'https://github.com/mindee/doctr/releases/download/v0.4.1/resnet18-d4634669.zip',
+default_cfgs: dict[str, dict[str, Any]] = {
+    "resnet18": {
+        "mean": (0.694, 0.695, 0.693),
+        "std": (0.299, 0.296, 0.301),
+        "input_shape": (32, 32, 3),
+        "classes": list(VOCABS["french"]),
+        "url": "https://doctr-static.mindee.com/models?id=v0.9.0/resnet18-f42d3854.weights.h5&src=0",
     },
-    'resnet31': {
-        'mean': (0.5, 0.5, 0.5),
-        'std': (1., 1., 1.),
-        'input_shape': (32, 32, 3),
-        'classes': list(VOCABS['french']),
-        'url': 'https://github.com/mindee/doctr/releases/download/v0.5.0/resnet31-5a47a60b.zip',
+    "resnet31": {
+        "mean": (0.694, 0.695, 0.693),
+        "std": (0.299, 0.296, 0.301),
+        "input_shape": (32, 32, 3),
+        "classes": list(VOCABS["french"]),
+        "url": "https://doctr-static.mindee.com/models?id=v0.9.0/resnet31-ab75f78c.weights.h5&src=0",
     },
-    'resnet34': {
-        'mean': (0.694, 0.695, 0.693),
-        'std': (0.299, 0.296, 0.301),
-        'input_shape': (32, 32, 3),
-        'classes': list(VOCABS['french']),
-        'url': 'https://github.com/mindee/doctr/releases/download/v0.5.0/resnet34-5dcc97ca.zip',
+    "resnet34": {
+        "mean": (0.694, 0.695, 0.693),
+        "std": (0.299, 0.296, 0.301),
+        "input_shape": (32, 32, 3),
+        "classes": list(VOCABS["french"]),
+        "url": "https://doctr-static.mindee.com/models?id=v0.9.0/resnet34-03967df9.weights.h5&src=0",
     },
-    'resnet50': {
-        'mean': (0.694, 0.695, 0.693),
-        'std': (0.299, 0.296, 0.301),
-        'input_shape': (32, 32, 3),
-        'classes': list(VOCABS['french']),
-        'url': 'https://github.com/mindee/doctr/releases/download/v0.5.0/resnet50-e75e4cdf.zip',
+    "resnet50": {
+        "mean": (0.694, 0.695, 0.693),
+        "std": (0.299, 0.296, 0.301),
+        "input_shape": (32, 32, 3),
+        "classes": list(VOCABS["french"]),
+        "url": "https://doctr-static.mindee.com/models?id=v0.9.0/resnet50-82358f34.weights.h5&src=0",
     },
-    'resnet34_wide': {
-        'mean': (0.694, 0.695, 0.693),
-        'std': (0.299, 0.296, 0.301),
-        'input_shape': (32, 32, 3),
-        'classes': list(VOCABS['french']),
-        'url': 'https://github.com/mindee/doctr/releases/download/v0.5.0/resnet34_wide-c1271816.zip',
+    "resnet34_wide": {
+        "mean": (0.694, 0.695, 0.693),
+        "std": (0.299, 0.296, 0.301),
+        "input_shape": (32, 32, 3),
+        "classes": list(VOCABS["french"]),
+        "url": "https://doctr-static.mindee.com/models?id=v0.9.0/resnet34_wide-b18fdf79.weights.h5&src=0",
     },
 }
 
 
 class ResnetBlock(layers.Layer):
-
     """Implements a resnet31 block with shortcut
 
     Args:
@@ -67,51 +67,38 @@ class ResnetBlock(layers.Layer):
         kernel_size: size of square kernels
         strides: strides to use in the first convolution of the block
     """
-    def __init__(
-        self,
-        output_channels: int,
-        conv_shortcut: bool,
-        strides: int = 1,
-        **kwargs
-    ) -> None:
 
+    def __init__(self, output_channels: int, conv_shortcut: bool, strides: int = 1, **kwargs) -> None:
         super().__init__(**kwargs)
         if conv_shortcut:
-            self.shortcut = Sequential(
-                [
-                    layers.Conv2D(
-                        filters=output_channels,
-                        strides=strides,
-                        padding='same',
-                        kernel_size=1,
-                        use_bias=False,
-                        kernel_initializer='he_normal'
-                    ),
-                    layers.BatchNormalization()
-                ]
-            )
+            self.shortcut = Sequential([
+                layers.Conv2D(
+                    filters=output_channels,
+                    strides=strides,
+                    padding="same",
+                    kernel_size=1,
+                    use_bias=False,
+                    kernel_initializer="he_normal",
+                ),
+                layers.BatchNormalization(),
+            ])
         else:
             self.shortcut = layers.Lambda(lambda x: x)
-        self.conv_block = Sequential(
-            self.conv_resnetblock(output_channels, 3, strides)
-        )
-        self.act = layers.Activation('relu')
+        self.conv_block = Sequential(self.conv_resnetblock(output_channels, 3, strides))
+        self.act = layers.Activation("relu")
 
     @staticmethod
     def conv_resnetblock(
         output_channels: int,
         kernel_size: int,
         strides: int = 1,
-    ) -> List[layers.Layer]:
+    ) -> list[layers.Layer]:
         return [
-            *conv_sequence(output_channels, 'relu', bn=True, strides=strides, kernel_size=kernel_size),
+            *conv_sequence(output_channels, "relu", bn=True, strides=strides, kernel_size=kernel_size),
             *conv_sequence(output_channels, None, bn=True, kernel_size=kernel_size),
         ]
 
-    def call(
-        self,
-        inputs: tf.Tensor
-    ) -> tf.Tensor:
+    def call(self, inputs: tf.Tensor) -> tf.Tensor:
         clone = self.shortcut(inputs)
         conv_out = self.conv_block(inputs)
         out = self.act(clone + conv_out)
@@ -120,14 +107,9 @@ class ResnetBlock(layers.Layer):
 
 
 def resnet_stage(
-    num_blocks: int,
-    out_channels: int,
-    shortcut: bool = False,
-    downsample: bool = False
-) -> List[layers.Layer]:
-    _layers: List[layers.Layer] = [
-        ResnetBlock(out_channels, conv_shortcut=shortcut, strides=2 if downsample else 1)
-    ]
+    num_blocks: int, out_channels: int, shortcut: bool = False, downsample: bool = False
+) -> list[layers.Layer]:
+    _layers: list[layers.Layer] = [ResnetBlock(out_channels, conv_shortcut=shortcut, strides=2 if downsample else 1)]
 
     for _ in range(1, num_blocks):
         _layers.append(ResnetBlock(out_channels, conv_shortcut=False))
@@ -154,42 +136,42 @@ class ResNet(Sequential):
 
     def __init__(
         self,
-        num_blocks: List[int],
-        output_channels: List[int],
-        stage_downsample: List[bool],
-        stage_conv: List[bool],
-        stage_pooling: List[Optional[Tuple[int, int]]],
+        num_blocks: list[int],
+        output_channels: list[int],
+        stage_downsample: list[bool],
+        stage_conv: list[bool],
+        stage_pooling: list[tuple[int, int] | None],
         origin_stem: bool = True,
         stem_channels: int = 64,
-        attn_module: Optional[Callable[[int], layers.Layer]] = None,
+        attn_module: Callable[[int], layers.Layer] | None = None,
         include_top: bool = True,
         num_classes: int = 1000,
-        cfg: Optional[Dict[str, Any]] = None,
-        input_shape: Optional[Tuple[int, int, int]] = None,
+        cfg: dict[str, Any] | None = None,
+        input_shape: tuple[int, int, int] | None = None,
     ) -> None:
-
         inplanes = stem_channels
         if origin_stem:
             _layers = [
-                *conv_sequence(inplanes, 'relu', True, kernel_size=7, strides=2, input_shape=input_shape),
-                layers.MaxPool2D(pool_size=(3, 3), strides=2, padding='same'),
+                *conv_sequence(inplanes, "relu", True, kernel_size=7, strides=2, input_shape=input_shape),
+                layers.MaxPool2D(pool_size=(3, 3), strides=2, padding="same"),
             ]
         else:
             _layers = [
-                *conv_sequence(inplanes // 2, 'relu', True, kernel_size=3, input_shape=input_shape),
-                *conv_sequence(inplanes, 'relu', True, kernel_size=3),
-                layers.MaxPool2D(pool_size=2, strides=2, padding='valid'),
+                *conv_sequence(inplanes // 2, "relu", True, kernel_size=3, input_shape=input_shape),
+                *conv_sequence(inplanes, "relu", True, kernel_size=3),
+                layers.MaxPool2D(pool_size=2, strides=2, padding="valid"),
             ]
 
-        for n_blocks, out_chan, down, conv, pool in zip(num_blocks, output_channels, stage_downsample, stage_conv,
-                                                        stage_pooling):
+        for n_blocks, out_chan, down, conv, pool in zip(
+            num_blocks, output_channels, stage_downsample, stage_conv, stage_pooling
+        ):
             _layers.extend(resnet_stage(n_blocks, out_chan, out_chan != inplanes, down))
             if attn_module is not None:
                 _layers.append(attn_module(out_chan))
             if conv:
-                _layers.extend(conv_sequence(out_chan, activation='relu', bn=True, kernel_size=3))
+                _layers.extend(conv_sequence(out_chan, activation="relu", bn=True, kernel_size=3))
             if pool:
-                _layers.append(layers.MaxPool2D(pool_size=pool, strides=pool, padding='valid'))
+                _layers.append(layers.MaxPool2D(pool_size=pool, strides=pool, padding="valid"))
             inplanes = out_chan
 
         if include_top:
@@ -205,31 +187,37 @@ class ResNet(Sequential):
 def _resnet(
     arch: str,
     pretrained: bool,
-    num_blocks: List[int],
-    output_channels: List[int],
-    stage_downsample: List[bool],
-    stage_conv: List[bool],
-    stage_pooling: List[Optional[Tuple[int, int]]],
+    num_blocks: list[int],
+    output_channels: list[int],
+    stage_downsample: list[bool],
+    stage_conv: list[bool],
+    stage_pooling: list[tuple[int, int] | None],
     origin_stem: bool = True,
-    **kwargs: Any
+    **kwargs: Any,
 ) -> ResNet:
-
-    kwargs['num_classes'] = kwargs.get("num_classes", len(default_cfgs[arch]['classes']))
-    kwargs['input_shape'] = kwargs.get("input_shape", default_cfgs[arch]['input_shape'])
-    kwargs['classes'] = kwargs.get('classes', default_cfgs[arch]['classes'])
+    kwargs["num_classes"] = kwargs.get("num_classes", len(default_cfgs[arch]["classes"]))
+    kwargs["input_shape"] = kwargs.get("input_shape", default_cfgs[arch]["input_shape"])
+    kwargs["classes"] = kwargs.get("classes", default_cfgs[arch]["classes"])
 
     _cfg = deepcopy(default_cfgs[arch])
-    _cfg['num_classes'] = kwargs['num_classes']
-    _cfg['classes'] = kwargs['classes']
-    _cfg['input_shape'] = kwargs['input_shape']
-    kwargs.pop('classes')
+    _cfg["num_classes"] = kwargs["num_classes"]
+    _cfg["classes"] = kwargs["classes"]
+    _cfg["input_shape"] = kwargs["input_shape"]
+    kwargs.pop("classes")
 
     # Build the model
-    model = ResNet(num_blocks, output_channels, stage_downsample,
-                   stage_conv, stage_pooling, origin_stem, cfg=_cfg, **kwargs)
+    model = ResNet(
+        num_blocks, output_channels, stage_downsample, stage_conv, stage_pooling, origin_stem, cfg=_cfg, **kwargs
+    )
+    _build_model(model)
+
     # Load pretrained parameters
     if pretrained:
-        load_pretrained_params(model, default_cfgs[arch]['url'])
+        # The number of classes is not the same as the number of classes in the pretrained model =>
+        # skip the mismatching layers for fine tuning
+        load_pretrained_params(
+            model, default_cfgs[arch]["url"], skip_mismatch=kwargs["num_classes"] != len(default_cfgs[arch]["classes"])
+        )
 
     return model
 
@@ -246,13 +234,13 @@ def resnet18(pretrained: bool = False, **kwargs: Any) -> ResNet:
 
     Args:
         pretrained: boolean, True if model is pretrained
+        **kwargs: keyword arguments of the ResNet architecture
 
     Returns:
         A classification model
     """
-
     return _resnet(
-        'resnet18',
+        "resnet18",
         pretrained,
         [2, 2, 2, 2],
         [64, 128, 256, 512],
@@ -277,13 +265,13 @@ def resnet31(pretrained: bool = False, **kwargs: Any) -> ResNet:
 
     Args:
         pretrained: boolean, True if model is pretrained
+        **kwargs: keyword arguments of the ResNet architecture
 
     Returns:
         A classification model
     """
-
     return _resnet(
-        'resnet31',
+        "resnet31",
         pretrained,
         [1, 2, 5, 3],
         [256, 256, 512, 512],
@@ -308,13 +296,13 @@ def resnet34(pretrained: bool = False, **kwargs: Any) -> ResNet:
 
     Args:
         pretrained: boolean, True if model is pretrained
+        **kwargs: keyword arguments of the ResNet architecture
 
     Returns:
         A classification model
     """
-
     return _resnet(
-        'resnet34',
+        "resnet34",
         pretrained,
         [3, 4, 6, 3],
         [64, 128, 256, 512],
@@ -338,35 +326,42 @@ def resnet50(pretrained: bool = False, **kwargs: Any) -> ResNet:
 
     Args:
         pretrained: boolean, True if model is pretrained
+        **kwargs: keyword arguments of the ResNet architecture
 
     Returns:
         A classification model
     """
+    kwargs["num_classes"] = kwargs.get("num_classes", len(default_cfgs["resnet50"]["classes"]))
+    kwargs["input_shape"] = kwargs.get("input_shape", default_cfgs["resnet50"]["input_shape"])
+    kwargs["classes"] = kwargs.get("classes", default_cfgs["resnet50"]["classes"])
 
-    kwargs['num_classes'] = kwargs.get("num_classes", len(default_cfgs['resnet50']['classes']))
-    kwargs['input_shape'] = kwargs.get("input_shape", default_cfgs['resnet50']['input_shape'])
-    kwargs['classes'] = kwargs.get('classes', default_cfgs['resnet50']['classes'])
-
-    _cfg = deepcopy(default_cfgs['resnet50'])
-    _cfg['num_classes'] = kwargs['num_classes']
-    _cfg['classes'] = kwargs['classes']
-    _cfg['input_shape'] = kwargs['input_shape']
-    kwargs.pop('classes')
+    _cfg = deepcopy(default_cfgs["resnet50"])
+    _cfg["num_classes"] = kwargs["num_classes"]
+    _cfg["classes"] = kwargs["classes"]
+    _cfg["input_shape"] = kwargs["input_shape"]
+    kwargs.pop("classes")
 
     model = ResNet50(
         weights=None,
         include_top=True,
         pooling=True,
-        input_shape=kwargs['input_shape'],
-        classes=kwargs['num_classes'],
+        input_shape=kwargs["input_shape"],
+        classes=kwargs["num_classes"],
         classifier_activation=None,
     )
 
     model.cfg = _cfg
+    _build_model(model)
 
     # Load pretrained parameters
     if pretrained:
-        load_pretrained_params(model, default_cfgs['resnet50']['url'])
+        # The number of classes is not the same as the number of classes in the pretrained model =>
+        # skip the mismatching layers for fine tuning
+        load_pretrained_params(
+            model,
+            default_cfgs["resnet50"]["url"],
+            skip_mismatch=kwargs["num_classes"] != len(default_cfgs["resnet50"]["classes"]),
+        )
 
     return model
 
@@ -383,13 +378,13 @@ def resnet34_wide(pretrained: bool = False, **kwargs: Any) -> ResNet:
 
     Args:
         pretrained: boolean, True if model is pretrained
+        **kwargs: keyword arguments of the ResNet architecture
 
     Returns:
         A classification model
     """
-
     return _resnet(
-        'resnet34_wide',
+        "resnet34_wide",
         pretrained,
         [3, 4, 6, 3],
         [128, 256, 512, 1024],

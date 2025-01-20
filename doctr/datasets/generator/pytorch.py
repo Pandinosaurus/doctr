@@ -1,20 +1,20 @@
-# Copyright (C) 2021-2022, Mindee.
+# Copyright (C) 2021-2025, Mindee.
 
-# This program is licensed under the Apache License version 2.
-# See LICENSE or go to <https://www.apache.org/licenses/LICENSE-2.0.txt> for full license details.
+# This program is licensed under the Apache License 2.0.
+# See LICENSE or go to <https://opensource.org/licenses/Apache-2.0> for full license details.
 
 from torch.utils.data._utils.collate import default_collate
 
 from .base import _CharacterGenerator, _WordGenerator
 
-__all__ = ['CharacterGenerator', 'WordGenerator']
+__all__ = ["CharacterGenerator", "WordGenerator"]
 
 
 class CharacterGenerator(_CharacterGenerator):
     """Implements a character image generation dataset
 
     >>> from doctr.datasets import CharacterGenerator
-    >>> ds = CharacterGenerator(vocab='abdef')
+    >>> ds = CharacterGenerator(vocab='abdef', num_samples=100)
     >>> img, target = ds[0]
 
     Args:
@@ -28,14 +28,14 @@ class CharacterGenerator(_CharacterGenerator):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        setattr(self, 'collate_fn', default_collate)
+        setattr(self, "collate_fn", default_collate)
 
 
 class WordGenerator(_WordGenerator):
     """Implements a character image generation dataset
 
     >>> from doctr.datasets import WordGenerator
-    >>> ds = WordGenerator(vocab='abdef')
+    >>> ds = WordGenerator(vocab='abdef', min_chars=1, max_chars=32, num_samples=100)
     >>> img, target = ds[0]
 
     Args:

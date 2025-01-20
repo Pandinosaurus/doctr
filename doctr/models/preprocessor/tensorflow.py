@@ -1,10 +1,10 @@
-# Copyright (C) 2021-2022, Mindee.
+# Copyright (C) 2021-2025, Mindee.
 
-# This program is licensed under the Apache License version 2.
-# See LICENSE or go to <https://www.apache.org/licenses/LICENSE-2.0.txt> for full license details.
+# This program is licensed under the Apache License 2.0.
+# See LICENSE or go to <https://opensource.org/licenses/Apache-2.0> for full license details.
 
 import math
-from typing import Any, List, Tuple, Union
+from typing import Any
 
 import numpy as np
 import tensorflow as tf
@@ -13,7 +13,7 @@ from doctr.transforms import Normalize, Resize
 from doctr.utils.multithreading import multithread_exec
 from doctr.utils.repr import NestedObject
 
-__all__ = ['PreProcessor']
+__all__ = ["PreProcessor"]
 
 
 class PreProcessor(NestedObject):
@@ -24,29 +24,26 @@ class PreProcessor(NestedObject):
         batch_size: the size of page batches
         mean: mean value of the training distribution by channel
         std: standard deviation of the training distribution by channel
+        **kwargs: additional arguments for the resizing operation
     """
 
-    _children_names: List[str] = ['resize', 'normalize']
+    _children_names: list[str] = ["resize", "normalize"]
 
     def __init__(
         self,
-        output_size: Tuple[int, int],
+        output_size: tuple[int, int],
         batch_size: int,
-        mean: Tuple[float, float, float] = (.5, .5, .5),
-        std: Tuple[float, float, float] = (1., 1., 1.),
-        fp16: bool = False,
+        mean: tuple[float, float, float] = (0.5, 0.5, 0.5),
+        std: tuple[float, float, float] = (1.0, 1.0, 1.0),
         **kwargs: Any,
     ) -> None:
-
         self.batch_size = batch_size
         self.resize = Resize(output_size, **kwargs)
         # Perform the division by 255 at the same time
         self.normalize = Normalize(mean, std)
+        self._runs_on_cuda = tf.config.list_physical_devices("GPU") != []
 
-    def batch_inputs(
-        self,
-        samples: List[tf.Tensor]
-    ) -> List[tf.Tensor]:
+    def batch_inputs(self, samples: list[tf.Tensor]) -> list[tf.Tensor]:
         """Gather samples into batches for inference purposes
 
         Args:
@@ -55,16 +52,15 @@ class PreProcessor(NestedObject):
         Returns:
             list of batched samples
         """
-
         num_batches = int(math.ceil(len(samples) / self.batch_size))
         batches = [
-            tf.stack(samples[idx * self.batch_size: min((idx + 1) * self.batch_size, len(samples))], axis=0)
+            tf.stack(samples[idx * self.batch_size : min((idx + 1) * self.batch_size, len(samples))], axis=0)
             for idx in range(int(num_batches))
         ]
 
         return batches
 
-    def sample_transforms(self, x: Union[np.ndarray, tf.Tensor]) -> tf.Tensor:
+    def sample_transforms(self, x: np.ndarray | tf.Tensor) -> tf.Tensor:
         if x.ndim != 3:
             raise AssertionError("expected list of 3D Tensors")
         if isinstance(x, np.ndarray):
@@ -81,18 +77,15 @@ class PreProcessor(NestedObject):
 
         return x
 
-    def __call__(
-        self,
-        x: Union[tf.Tensor, np.ndarray, List[Union[tf.Tensor, np.ndarray]]]
-    ) -> List[tf.Tensor]:
+    def __call__(self, x: tf.Tensor | np.ndarray | list[tf.Tensor | np.ndarray]) -> list[tf.Tensor]:
         """Prepare document data for model forwarding
 
         Args:
             x: list of images (np.array) or tensors (already resized and batched)
+
         Returns:
             list of page batches
         """
-
         # Input type check
         if isinstance(x, (np.ndarray, tf.Tensor)):
             if x.ndim != 4:
@@ -108,20 +101,22 @@ class PreProcessor(NestedObject):
             if x.dtype == tf.uint8:
                 x = tf.image.convert_image_dtype(x, dtype=tf.float32)
             # Resizing
-            if (x.shape[1], x.shape[2]) != self.resize.output_size:  # type: ignore[index]
-                x = tf.image.resize(x, self.resize.output_size, method=self.resize.method)
+            if (x.shape[1], x.shape[2]) != self.resize.output_size:
+                x = tf.image.resize(
+                    x, self.resize.output_size, method=self.resize.method, antialias=self.resize.antialias
+                )
 
             batches = [x]
 
         elif isinstance(x, list) and all(isinstance(sample, (np.ndarray, tf.Tensor)) for sample in x):
             # Sample transform (to tensor, resize)
-            samples = multithread_exec(self.sample_transforms, x)
+            samples = list(multithread_exec(self.sample_transforms, x, threads=1 if self._runs_on_cuda else None))
             # Batching
-            batches = self.batch_inputs(samples)  # type: ignore[arg-type]
+            batches = self.batch_inputs(samples)
         else:
             raise TypeError(f"invalid input type: {type(x)}")
 
         # Batch transforms (normalize)
-        batches = multithread_exec(self.normalize, batches)  # type: ignore[assignment]
+        batches = list(multithread_exec(self.normalize, batches, threads=1 if self._runs_on_cuda else None))
 
         return batches

@@ -1,28 +1,27 @@
-# Copyright (C) 2021-2022, Mindee.
+# Copyright (C) 2021-2025, Mindee.
 
-# This program is licensed under the Apache License version 2.
-# See LICENSE or go to <https://www.apache.org/licenses/LICENSE-2.0.txt> for full license details.
+# This program is licensed under the Apache License 2.0.
+# See LICENSE or go to <https://opensource.org/licenses/Apache-2.0> for full license details.
 
 from pathlib import Path
-from typing import Optional, Tuple
 
 import cv2
 import numpy as np
 
 from doctr.utils.common_types import AbstractFile
 
-__all__ = ['read_img_as_numpy']
+__all__ = ["read_img_as_numpy"]
 
 
 def read_img_as_numpy(
     file: AbstractFile,
-    output_size: Optional[Tuple[int, int]] = None,
+    output_size: tuple[int, int] | None = None,
     rgb_output: bool = True,
 ) -> np.ndarray:
     """Read an image file into numpy format
 
-    >>> from doctr.documents import read_img
-    >>> page = read_img("path/to/your/doc.jpg")
+    >>> from doctr.io import read_img_as_numpy
+    >>> page = read_img_as_numpy("path/to/your/doc.jpg")
 
     Args:
         file: the path to the image file
@@ -32,14 +31,13 @@ def read_img_as_numpy(
     Returns:
         the page decoded as numpy ndarray of shape H x W x 3
     """
-
     if isinstance(file, (str, Path)):
         if not Path(file).is_file():
             raise FileNotFoundError(f"unable to access {file}")
         img = cv2.imread(str(file), cv2.IMREAD_COLOR)
     elif isinstance(file, bytes):
-        file = np.frombuffer(file, np.uint8)
-        img = cv2.imdecode(file, cv2.IMREAD_COLOR)
+        _file: np.ndarray = np.frombuffer(file, np.uint8)
+        img = cv2.imdecode(_file, cv2.IMREAD_COLOR)
     else:
         raise TypeError("unsupported object type for argument 'file'")
 

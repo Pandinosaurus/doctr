@@ -1,12 +1,12 @@
-# Copyright (C) 2021-2022, Mindee.
+# Copyright (C) 2021-2025, Mindee.
 
-# This program is licensed under the Apache License version 2.
-# See LICENSE or go to <https://www.apache.org/licenses/LICENSE-2.0.txt> for full license details.
+# This program is licensed under the Apache License 2.0.
+# See LICENSE or go to <https://opensource.org/licenses/Apache-2.0> for full license details.
 
 import json
 import os
 from pathlib import Path
-from typing import Any, List, Tuple
+from typing import Any
 
 from .datasets import AbstractDataset
 
@@ -35,8 +35,8 @@ class RecognitionDataset(AbstractDataset):
     ) -> None:
         super().__init__(img_folder, **kwargs)
 
-        self.data: List[Tuple[str, str]] = []
-        with open(labels_path) as f:
+        self.data: list[tuple[str, str]] = []
+        with open(labels_path, encoding="utf-8") as f:
             labels = json.load(f)
 
         for img_name, label in labels.items():

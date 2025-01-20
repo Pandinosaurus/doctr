@@ -3,55 +3,71 @@ doctr.datasets
 
 .. currentmodule:: doctr.datasets
 
-Whether it is for training or for evaluation, having predefined objects to access datasets in your prefered framework
-can be a significant save of time.
-
-
 .. _datasets:
 
-Available Datasets
-------------------
-Here are all datasets that are available through docTR:
-
-
-Public datasets
-^^^^^^^^^^^^^^^
+doctr.datasets
+--------------
 
 .. autoclass:: FUNSD
+
 .. autoclass:: SROIE
+
 .. autoclass:: CORD
+
 .. autoclass:: IIIT5K
+
 .. autoclass:: SVT
+
 .. autoclass:: SVHN
+
 .. autoclass:: SynthText
+
 .. autoclass:: IC03
+
 .. autoclass:: IC13
+
 .. autoclass:: IMGUR5K
+
 .. autoclass:: MJSynth
 
-docTR synthetic datasets
-^^^^^^^^^^^^^^^^^^^^^^^^
+.. autoclass:: IIITHWS
 
 .. autoclass:: DocArtefacts
+
+.. autoclass:: WILDRECEIPT
+
+Synthetic dataset generator
+---------------------------
+
 .. autoclass:: CharacterGenerator
+
 .. autoclass:: WordGenerator
 
-docTR private datasets
-^^^^^^^^^^^^^^^^^^^^^^
-
-Since many documents include sensitive / personal information, we are not able to share all the data that has been used for this project. However, we provide some guidance on how to format your own dataset into the same format so that you can use all docTR tools all the same.
+Custom dataset loader
+---------------------
 
 .. autoclass:: DetectionDataset
+
 .. autoclass:: RecognitionDataset
+
 .. autoclass:: OCRDataset
 
+Dataset utils
+-------------
 
-Data Loading
-------------
-Each dataset has its specific way to load a sample, but handling batch aggregation and the underlying iterator is a task deferred to another object in docTR.
+.. autofunction:: translate
 
-.. autoclass:: doctr.datasets.loader.DataLoader
+.. autofunction:: encode_string
 
+.. autofunction:: decode_sequence
+
+.. autofunction:: encode_sequences
+
+.. autofunction:: pre_transform_multiclass
+
+.. autofunction:: crop_bboxes_from_image
+
+.. autofunction:: convert_target_to_relative
 
 .. _vocabs:
 
@@ -71,6 +87,9 @@ of vocabs.
    * - digits
      - 10
      - 0123456789
+   * - hindi_digits
+     - 10
+     - ٠١٢٣٤٥٦٧٨٩
    * - ascii_letters
      - 52
      - abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ
@@ -80,6 +99,24 @@ of vocabs.
    * - currency
      - 5
      - £€¥¢฿
+   * - ancient_greek
+     - 48
+     - αβγδεζηθικλμνξοπρστυφχψωΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ
+   * - arabic_letters
+     - 37
+     - ءآأؤإئابةتثجحخدذرزسشصضطظعغـفقكلمنهوىي
+   * - generic_cyrillic_letters
+     - 58
+     - абвгдежзийклмнопрстуфхцчшщьюяАБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЬЮЯ
+   * - persian_letters
+     - 5
+     - پچڢڤگ
+   * - arabic_diacritics
+     - 2
+     - 'ًٌٍَُِّْ'
+   * - arabic_punctuation
+     - 5
+     - ؟؛«»—
    * - latin
      - 94
      - 0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~
@@ -98,8 +135,54 @@ of vocabs.
    * - spanish
      - 116
      - 0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~°£€¥¢฿áéíóúüñÁÉÍÓÚÜÑ¡¿
+   * - italian
+     - 120
+     - 0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~°£€¥¢฿àèéìíîòóùúÀÈÉÌÍÎÒÓÙÚ
    * - german
      - 108
      - 0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~°£€¥¢฿äöüßÄÖÜẞ
-
-.. autofunction:: encode_sequences
+   * - arabic
+     - 101
+     - ءآأؤإئابةتثجحخدذرزسشصضطظعغـفقكلمنهوىيپچڢڤگ؟؛«»—0123456789٠١٢٣٤٥٦٧٨٩'ًٌٍَُِّْ'!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~
+   * - czech
+     - 130
+     - 0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~°£€¥¢฿áčďéěíňóřšťúůýžÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ
+   * - polish
+     - 118
+     - 0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~°£€¥¢฿ąćęłńóśźżĄĆĘŁŃÓŚŹŻ
+   * - dutch
+     - 114
+     - 0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~°£€¥¢฿áéíóúüñÁÉÍÓÚÜÑ
+   * - norwegian
+     - 106
+     - 0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~°£€¥¢฿æøåÆØÅ
+   * - danish
+     - 106
+     - 0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~°£€¥¢฿æøåÆØÅ
+   * - finnish
+     - 104
+     - 0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~°£€¥¢฿äöÄÖ
+   * - swedish
+     - 106
+     - 0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~°£€¥¢฿åäöÅÄÖ
+   * - ukrainian
+     - 115
+     - абвгдежзийклмнопрстуфхцчшщьюяАБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЬЮЯ0123456789!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~°£€¥¢฿ґіїєҐІЇЄ₴
+   * - vietnamese
+     - 234
+     - 0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~°£€¥¢฿áàảạãăắằẳẵặâấầẩẫậđéèẻẽẹêếềểễệóòỏõọôốồổộỗơớờởợỡúùủũụưứừửữựíìỉĩịýỳỷỹỵÁÀẢẠÃĂẮẰẲẴẶÂẤẦẨẪẬĐÉÈẺẼẸÊẾỀỂỄỆÓÒỎÕỌÔỐỒỔỘỖƠỚỜỞỢỠÚÙỦŨỤƯỨỪỬỮỰÍÌỈĨỊÝỲỶỸỴ
+   * - hebrew
+     - 123
+     - 0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~°£€¥¢฿אבגדהוזחטיכלמנסעפצקרשת₪
+   * - hindi
+     - 68
+     - अआइईउऊऋॠऌॡएऐओऔंःकखगघङचछजझञटठडढणतथदधनपफबभमयरलवशषसह०१२३४५६७८९।,?!:्ॐ॰॥
+   * - bangla
+     - 70
+     - অআইঈউঊঋএঐওঔকখগঘঙচছজঝঞটঠডঢণতথদধনপফবভমযরলশষসহ়ঽািীুূৃেৈোৌ্ৎংঃঁ০১২৩৪৫৬৭৮৯
+   * - gujarati
+     - 98
+     - અઆઇઈઉઊઋએઐઓઔખગઘચછજઝઞટઠડઢણતથદધનપફબભમયરલવશસહળક્ષ૦૧૨૩૪૫૬૭૮૯!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~૰ઽ◌ંઃ॥ૐ઼ ઁ૱
+   * - multilingual
+     - 195
+     - english & french & german & italian & spanish & portuguese & czech & polish & dutch & norwegian & danish & finnish & swedish & §

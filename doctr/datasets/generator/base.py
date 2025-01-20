@@ -1,10 +1,11 @@
-# Copyright (C) 2021-2022, Mindee.
+# Copyright (C) 2021-2025, Mindee.
 
-# This program is licensed under the Apache License version 2.
-# See LICENSE or go to <https://www.apache.org/licenses/LICENSE-2.0.txt> for full license details.
+# This program is licensed under the Apache License 2.0.
+# See LICENSE or go to <https://opensource.org/licenses/Apache-2.0> for full license details.
 
 import random
-from typing import Any, Callable, List, Optional, Tuple, Union
+from collections.abc import Callable
+from typing import Any
 
 from PIL import Image, ImageDraw
 
@@ -17,10 +18,10 @@ from ..datasets import AbstractDataset
 def synthesize_text_img(
     text: str,
     font_size: int = 32,
-    font_family: Optional[str] = None,
-    background_color: Optional[Tuple[int, int, int]] = None,
-    text_color: Optional[Tuple[int, int, int]] = None,
-) -> Image:
+    font_family: str | None = None,
+    background_color: tuple[int, int, int] | None = None,
+    text_color: tuple[int, int, int] | None = None,
+) -> Image.Image:
     """Generate a synthetic text image
 
     Args:
@@ -33,17 +34,17 @@ def synthesize_text_img(
     Returns:
         PIL image of the text
     """
-
     background_color = (0, 0, 0) if background_color is None else background_color
     text_color = (255, 255, 255) if text_color is None else text_color
 
     font = get_font(font_family, font_size)
-    text_w, text_h = font.getsize(text)
+    left, top, right, bottom = font.getbbox(text)
+    text_w, text_h = right - left, bottom - top
     h, w = int(round(1.3 * text_h)), int(round(1.1 * text_w))
     # If single letter, make the image square, otherwise expand to meet the text size
     img_size = (h, w) if len(text) > 1 else (max(h, w), max(h, w))
 
-    img = Image.new('RGB', img_size[::-1], color=background_color)
+    img = Image.new("RGB", img_size[::-1], color=background_color)
     d = ImageDraw.Draw(img)
 
     # Offset so that the text is centered
@@ -54,15 +55,14 @@ def synthesize_text_img(
 
 
 class _CharacterGenerator(AbstractDataset):
-
     def __init__(
         self,
         vocab: str,
         num_samples: int,
         cache_samples: bool = False,
-        font_family: Optional[Union[str, List[str]]] = None,
-        img_transforms: Optional[Callable[[Any], Any]] = None,
-        sample_transforms: Optional[Callable[[Any, Any], Tuple[Any, Any]]] = None,
+        font_family: str | list[str] | None = None,
+        img_transforms: Callable[[Any], Any] | None = None,
+        sample_transforms: Callable[[Any, Any], tuple[Any, Any]] | None = None,
     ) -> None:
         self.vocab = vocab
         self._num_samples = num_samples
@@ -77,21 +77,22 @@ class _CharacterGenerator(AbstractDataset):
         self.img_transforms = img_transforms
         self.sample_transforms = sample_transforms
 
-        self._data: List[Image.Image] = []
+        self._data: list[Image.Image] = []
         if cache_samples:
             self._data = [
-                (synthesize_text_img(char, font_family=font), idx)
-                for idx, char in enumerate(self.vocab) for font in self.font_family
+                (synthesize_text_img(char, font_family=font), idx)  # type: ignore[misc]
+                for idx, char in enumerate(self.vocab)
+                for font in self.font_family
             ]
 
     def __len__(self) -> int:
         return self._num_samples
 
-    def _read_sample(self, index: int) -> Tuple[Any, int]:
+    def _read_sample(self, index: int) -> tuple[Any, int]:
         # Samples are already cached
         if len(self._data) > 0:
             idx = index % len(self._data)
-            pil_img, target = self._data[idx]
+            pil_img, target = self._data[idx]  # type: ignore[misc]
         else:
             target = index % len(self.vocab)
             pil_img = synthesize_text_img(self.vocab[target], font_family=random.choice(self.font_family))
@@ -101,7 +102,6 @@ class _CharacterGenerator(AbstractDataset):
 
 
 class _WordGenerator(AbstractDataset):
-
     def __init__(
         self,
         vocab: str,
@@ -109,9 +109,9 @@ class _WordGenerator(AbstractDataset):
         max_chars: int,
         num_samples: int,
         cache_samples: bool = False,
-        font_family: Optional[Union[str, List[str]]] = None,
-        img_transforms: Optional[Callable[[Any], Any]] = None,
-        sample_transforms: Optional[Callable[[Any, Any], Tuple[Any, Any]]] = None,
+        font_family: str | list[str] | None = None,
+        img_transforms: Callable[[Any], Any] | None = None,
+        sample_transforms: Callable[[Any, Any], tuple[Any, Any]] | None = None,
     ) -> None:
         self.vocab = vocab
         self.wordlen_range = (min_chars, max_chars)
@@ -127,11 +127,11 @@ class _WordGenerator(AbstractDataset):
         self.img_transforms = img_transforms
         self.sample_transforms = sample_transforms
 
-        self._data: List[Image.Image] = []
+        self._data: list[Image.Image] = []
         if cache_samples:
             _words = [self._generate_string(*self.wordlen_range) for _ in range(num_samples)]
             self._data = [
-                (synthesize_text_img(text, font_family=random.choice(self.font_family)), text)
+                (synthesize_text_img(text, font_family=random.choice(self.font_family)), text)  # type: ignore[misc]
                 for text in _words
             ]
 
@@ -142,10 +142,10 @@ class _WordGenerator(AbstractDataset):
     def __len__(self) -> int:
         return self._num_samples
 
-    def _read_sample(self, index: int) -> Tuple[Any, str]:
+    def _read_sample(self, index: int) -> tuple[Any, str]:
         # Samples are already cached
         if len(self._data) > 0:
-            pil_img, target = self._data[index]
+            pil_img, target = self._data[index]  # type: ignore[misc]
         else:
             target = self._generate_string(*self.wordlen_range)
             pil_img = synthesize_text_img(target, font_family=random.choice(self.font_family))

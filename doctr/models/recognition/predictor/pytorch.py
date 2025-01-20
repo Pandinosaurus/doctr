@@ -1,19 +1,21 @@
-# Copyright (C) 2021-2022, Mindee.
+# Copyright (C) 2021-2025, Mindee.
 
-# This program is licensed under the Apache License version 2.
-# See LICENSE or go to <https://www.apache.org/licenses/LICENSE-2.0.txt> for full license details.
+# This program is licensed under the Apache License 2.0.
+# See LICENSE or go to <https://opensource.org/licenses/Apache-2.0> for full license details.
 
-from typing import Any, List, Tuple, Union
+from collections.abc import Sequence
+from typing import Any
 
 import numpy as np
 import torch
 from torch import nn
 
 from doctr.models.preprocessor import PreProcessor
+from doctr.models.utils import set_device_and_dtype
 
 from ._utils import remap_preds, split_crops
 
-__all__ = ['RecognitionPredictor']
+__all__ = ["RecognitionPredictor"]
 
 
 class RecognitionPredictor(nn.Module):
@@ -31,7 +33,6 @@ class RecognitionPredictor(nn.Module):
         model: nn.Module,
         split_wide_crops: bool = True,
     ) -> None:
-
         super().__init__()
         self.pre_processor = pre_processor
         self.model = model.eval()
@@ -40,13 +41,12 @@ class RecognitionPredictor(nn.Module):
         self.dil_factor = 1.4  # Dilation factor to overlap the crops
         self.target_ar = 6  # Target aspect ratio
 
-    @torch.no_grad()
+    @torch.inference_mode()
     def forward(
         self,
-        crops: List[Union[np.ndarray, torch.Tensor]],
+        crops: Sequence[np.ndarray | torch.Tensor],
         **kwargs: Any,
-    ) -> List[Tuple[str, float]]:
-
+    ) -> list[tuple[str, float]]:
         if len(crops) == 0:
             return []
         # Dimension check
@@ -57,24 +57,24 @@ class RecognitionPredictor(nn.Module):
         remapped = False
         if self.split_wide_crops:
             new_crops, crop_map, remapped = split_crops(
-                crops,
+                crops,  # type: ignore[arg-type]
                 self.critical_ar,
                 self.target_ar,
                 self.dil_factor,
-                isinstance(crops[0], np.ndarray)
+                isinstance(crops[0], np.ndarray),
             )
             if remapped:
                 crops = new_crops
 
         # Resize & batch them
-        processed_batches = self.pre_processor(crops)
+        processed_batches = self.pre_processor(crops)  # type: ignore[arg-type]
 
         # Forward it
-        _device = next(self.model.parameters()).device
-        raw = [
-            self.model(batch.to(device=_device), return_preds=True, **kwargs)['preds']  # type: ignore[operator]
-            for batch in processed_batches
-        ]
+        _params = next(self.model.parameters())
+        self.model, processed_batches = set_device_and_dtype(
+            self.model, processed_batches, _params.device, _params.dtype
+        )
+        raw = [self.model(batch, return_preds=True, **kwargs)["preds"] for batch in processed_batches]
 
         # Process outputs
         out = [charseq for batch in raw for charseq in batch]

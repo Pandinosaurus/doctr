@@ -1,20 +1,26 @@
-# Copyright (C) 2021-2022, Mindee.
+# Copyright (C) 2021-2025, Mindee.
 
-# This program is licensed under the Apache License version 2.
-# See LICENSE or go to <https://www.apache.org/licenses/LICENSE-2.0.txt> for full license details.
+# This program is licensed under the Apache License 2.0.
+# See LICENSE or go to <https://opensource.org/licenses/Apache-2.0> for full license details.
 
-from typing import Dict, List, Optional, Tuple
 
-import cv2
 import numpy as np
+from anyascii import anyascii
 from scipy.optimize import linear_sum_assignment
-from unidecode import unidecode
+from shapely.geometry import Polygon
 
-__all__ = ['TextMatch', 'box_iou', 'box_ioa', 'mask_iou', 'polygon_iou',
-           'nms', 'LocalizationConfusion', 'OCRMetric', 'DetectionMetric']
+__all__ = [
+    "TextMatch",
+    "box_iou",
+    "polygon_iou",
+    "nms",
+    "LocalizationConfusion",
+    "OCRMetric",
+    "DetectionMetric",
+]
 
 
-def string_match(word1: str, word2: str) -> Tuple[bool, bool, bool, bool]:
+def string_match(word1: str, word2: str) -> tuple[bool, bool, bool, bool]:
     """Performs string comparison with multiple levels of tolerance
 
     Args:
@@ -23,16 +29,16 @@ def string_match(word1: str, word2: str) -> Tuple[bool, bool, bool, bool]:
 
     Returns:
         a tuple with booleans specifying respectively whether the raw strings, their lower-case counterparts, their
-            unidecode counterparts and their lower-case unidecode counterparts match
+            anyascii counterparts and their lower-case anyascii counterparts match
     """
-    raw_match = (word1 == word2)
-    caseless_match = (word1.lower() == word2.lower())
-    unidecode_match = (unidecode(word1) == unidecode(word2))
+    raw_match = word1 == word2
+    caseless_match = word1.lower() == word2.lower()
+    anyascii_match = anyascii(word1) == anyascii(word2)
 
     # Warning: the order is important here otherwise the pair ("EUR", "€") cannot be matched
-    unicase_match = (unidecode(word1).lower() == unidecode(word2).lower())
+    unicase_match = anyascii(word1).lower() == anyascii(word2).lower()
 
-    return raw_match, caseless_match, unidecode_match, unicase_match
+    return raw_match, caseless_match, anyascii_match, unicase_match
 
 
 class TextMatch:
@@ -69,8 +75,8 @@ class TextMatch:
 
     def update(
         self,
-        gt: List[str],
-        pred: List[str],
+        gt: list[str],
+        pred: list[str],
     ) -> None:
         """Update the state of the metric with new predictions
 
@@ -78,25 +84,24 @@ class TextMatch:
             gt: list of groung-truth character sequences
             pred: list of predicted character sequences
         """
-
         if len(gt) != len(pred):
             raise AssertionError("prediction size does not match with ground-truth labels size")
 
         for gt_word, pred_word in zip(gt, pred):
-            _raw, _caseless, _unidecode, _unicase = string_match(gt_word, pred_word)
+            _raw, _caseless, _anyascii, _unicase = string_match(gt_word, pred_word)
             self.raw += int(_raw)
             self.caseless += int(_caseless)
-            self.unidecode += int(_unidecode)
+            self.anyascii += int(_anyascii)
             self.unicase += int(_unicase)
 
         self.total += len(gt)
 
-    def summary(self) -> Dict[str, float]:
+    def summary(self) -> dict[str, float]:
         """Computes the aggregated metrics
 
         Returns:
-            a dictionary with the exact match score for the raw data, its lower-case counterpart, its unidecode
-            counterpart and its lower-case unidecode counterpart
+            a dictionary with the exact match score for the raw data, its lower-case counterpart, its anyascii
+            counterpart and its lower-case anyascii counterpart
         """
         if self.total == 0:
             raise AssertionError("you need to update the metric before getting the summary")
@@ -104,14 +109,14 @@ class TextMatch:
         return dict(
             raw=self.raw / self.total,
             caseless=self.caseless / self.total,
-            unidecode=self.unidecode / self.total,
+            anyascii=self.anyascii / self.total,
             unicase=self.unicase / self.total,
         )
 
     def reset(self) -> None:
         self.raw = 0
         self.caseless = 0
-        self.unidecode = 0
+        self.anyascii = 0
         self.unicase = 0
         self.total = 0
 
@@ -126,8 +131,7 @@ def box_iou(boxes_1: np.ndarray, boxes_2: np.ndarray) -> np.ndarray:
     Returns:
         the IoU matrix of shape (N, M)
     """
-
-    iou_mat = np.zeros((boxes_1.shape[0], boxes_2.shape[0]), dtype=np.float32)
+    iou_mat: np.ndarray = np.zeros((boxes_1.shape[0], boxes_2.shape[0]), dtype=np.float32)
 
     if boxes_1.shape[0] > 0 and boxes_2.shape[0] > 0:
         l1, t1, r1, b1 = np.split(boxes_1, 4, axis=1)
@@ -138,74 +142,14 @@ def box_iou(boxes_1: np.ndarray, boxes_2: np.ndarray) -> np.ndarray:
         right = np.minimum(r1, r2.T)
         bot = np.minimum(b1, b2.T)
 
-        intersection = np.clip(right - left, 0, np.Inf) * np.clip(bot - top, 0, np.Inf)
+        intersection = np.clip(right - left, 0, np.inf) * np.clip(bot - top, 0, np.inf)
         union = (r1 - l1) * (b1 - t1) + ((r2 - l2) * (b2 - t2)).T - intersection
         iou_mat = intersection / union
 
     return iou_mat
 
 
-def box_ioa(boxes_1: np.ndarray, boxes_2: np.ndarray) -> np.ndarray:
-    """Computes the IoA (intersection over area) between two sets of bounding boxes:
-    ioa(i, j) = inter(i, j) / area(i)
-
-    Args:
-        boxes_1: bounding boxes of shape (N, 4) in format (xmin, ymin, xmax, ymax)
-        boxes_2: bounding boxes of shape (M, 4) in format (xmin, ymin, xmax, ymax)
-
-    Returns:
-        the IoA matrix of shape (N, M)
-    """
-
-    ioa_mat = np.zeros((boxes_1.shape[0], boxes_2.shape[0]), dtype=np.float32)
-
-    if boxes_1.shape[0] > 0 and boxes_2.shape[0] > 0:
-        l1, t1, r1, b1 = np.split(boxes_1, 4, axis=1)
-        l2, t2, r2, b2 = np.split(boxes_2, 4, axis=1)
-
-        left = np.maximum(l1, l2.T)
-        top = np.maximum(t1, t2.T)
-        right = np.minimum(r1, r2.T)
-        bot = np.minimum(b1, b2.T)
-
-        intersection = np.clip(right - left, 0, np.Inf) * np.clip(bot - top, 0, np.Inf)
-        area = (r1 - l1) * (b1 - t1)
-        ioa_mat = intersection / area
-
-    return ioa_mat
-
-
-def mask_iou(masks_1: np.ndarray, masks_2: np.ndarray) -> np.ndarray:
-    """Computes the IoU between two sets of boolean masks
-
-    Args:
-        masks_1: boolean masks of shape (N, H, W)
-        masks_2: boolean masks of shape (M, H, W)
-
-    Returns:
-        the IoU matrix of shape (N, M)
-    """
-
-    if masks_1.shape[1:] != masks_2.shape[1:]:
-        raise AssertionError("both boolean masks should have the same spatial shape")
-
-    iou_mat = np.zeros((masks_1.shape[0], masks_2.shape[0]), dtype=np.float32)
-
-    if masks_1.shape[0] > 0 and masks_2.shape[0] > 0:
-        axes = tuple(range(2, masks_1.ndim + 1))
-        intersection = np.logical_and(masks_1[:, None, ...], masks_2[None, ...]).sum(axis=axes)
-        union = np.logical_or(masks_1[:, None, ...], masks_2[None, ...]).sum(axis=axes)
-        iou_mat = intersection / union
-
-    return iou_mat
-
-
-def polygon_iou(
-    polys_1: np.ndarray,
-    polys_2: np.ndarray,
-    mask_shape: Tuple[int, int],
-    use_broadcasting: bool = False
-) -> np.ndarray:
+def polygon_iou(polys_1: np.ndarray, polys_2: np.ndarray) -> np.ndarray:
     """Computes the IoU between two sets of rotated bounding boxes
 
     Args:
@@ -217,85 +161,24 @@ def polygon_iou(
     Returns:
         the IoU matrix of shape (N, M)
     """
-
     if polys_1.ndim != 3 or polys_2.ndim != 3:
         raise AssertionError("expects boxes to be in format (N, 4, 2)")
 
     iou_mat = np.zeros((polys_1.shape[0], polys_2.shape[0]), dtype=np.float32)
 
-    if polys_1.shape[0] > 0 and polys_2.shape[0] > 0:
-        if use_broadcasting:
-            masks_1 = rbox_to_mask(polys_1, shape=mask_shape)
-            masks_2 = rbox_to_mask(polys_2, shape=mask_shape)
-            iou_mat = mask_iou(masks_1, masks_2)
-        else:
-            # Save memory by doing the computation for each pair
-            for idx, b1 in enumerate(polys_1):
-                m1 = _rbox_to_mask(b1, mask_shape)
-                for _idx, b2 in enumerate(polys_2):
-                    m2 = _rbox_to_mask(b2, mask_shape)
-                    iou_mat[idx, _idx] = np.logical_and(m1, m2).sum() / np.logical_or(m1, m2).sum()
+    shapely_polys_1 = [Polygon(poly) for poly in polys_1]
+    shapely_polys_2 = [Polygon(poly) for poly in polys_2]
+
+    for i, poly1 in enumerate(shapely_polys_1):
+        for j, poly2 in enumerate(shapely_polys_2):
+            intersection_area = poly1.intersection(poly2).area
+            union_area = poly1.area + poly2.area - intersection_area
+            iou_mat[i, j] = intersection_area / union_area
 
     return iou_mat
 
 
-def _rbox_to_mask(box: np.ndarray, shape: Tuple[int, int]) -> np.ndarray:
-    """Converts a rotated bounding box to a boolean mask
-
-    Args:
-        box: rotated bounding box of shape (4, 2)
-        shape: spatial shapes of the output masks
-
-    Returns:
-        the boolean mask of the specified shape
-    """
-
-    mask = np.zeros(shape, dtype=np.uint8)
-    # Get absolute coords
-    if box.dtype != int:
-        abs_box = box.copy()
-        abs_box[:, 0] = abs_box[:, 0] * shape[1]
-        abs_box[:, 1] = abs_box[:, 1] * shape[0]
-        abs_box = abs_box.round().astype(int)
-    else:
-        abs_box = box
-        abs_box[2:] = abs_box[2:] + 1
-    cv2.fillPoly(mask, [abs_box - 1], 1)
-
-    return mask.astype(bool)
-
-
-def rbox_to_mask(boxes: np.ndarray, shape: Tuple[int, int]) -> np.ndarray:
-    """Converts rotated bounding boxes to boolean masks
-
-    Args:
-        boxes: rotated bounding boxes of shape (N, 4, 2)
-        shape: spatial shapes of the output masks
-
-    Returns:
-        the boolean masks of shape (N, H, W)
-    """
-
-    masks = np.zeros((boxes.shape[0], *shape), dtype=np.uint8)
-
-    if boxes.shape[0] > 0:
-        # Get absolute coordinates
-        if boxes.dtype != np.int:
-            abs_boxes = boxes.copy()
-            abs_boxes[:, :, 0] = abs_boxes[:, :, 0] * shape[1]
-            abs_boxes[:, :, 1] = abs_boxes[:, :, 1] * shape[0]
-            abs_boxes = abs_boxes.round().astype(np.int)
-        else:
-            abs_boxes = boxes
-            abs_boxes[:, 2:] = abs_boxes[:, 2:] + 1
-
-        # TODO: optimize slicing to improve vectorization
-        for idx, _box in enumerate(abs_boxes):
-            cv2.fillPoly(masks[idx], [_box - 1], 1)
-    return masks.astype(bool)
-
-
-def nms(boxes: np.ndarray, thresh: float = .5) -> List[int]:
+def nms(boxes: np.ndarray, thresh: float = 0.5) -> list[int]:
     """Perform non-max suppression, borrowed from <https://github.com/rbgirshick/fast-rcnn>`_.
 
     Args:
@@ -368,21 +251,15 @@ class LocalizationConfusion:
     Args:
         iou_thresh: minimum IoU to consider a pair of prediction and ground truth as a match
         use_polygons: if set to True, predictions and targets will be expected to have rotated format
-        mask_shape: if use_polygons is True, describes the spatial shape of the image used
-        use_broadcasting: if use_polygons is True, use broadcasting for IoU computation by consuming more memory
     """
 
     def __init__(
         self,
         iou_thresh: float = 0.5,
         use_polygons: bool = False,
-        mask_shape: Tuple[int, int] = (1024, 1024),
-        use_broadcasting: bool = True,
     ) -> None:
         self.iou_thresh = iou_thresh
         self.use_polygons = use_polygons
-        self.mask_shape = mask_shape
-        self.use_broadcasting = use_broadcasting
         self.reset()
 
     def update(self, gts: np.ndarray, preds: np.ndarray) -> None:
@@ -392,11 +269,10 @@ class LocalizationConfusion:
             gts: a set of relative bounding boxes either of shape (N, 4) or (N, 5) if they are rotated ones
             preds: a set of relative bounding boxes either of shape (M, 4) or (M, 5) if they are rotated ones
         """
-
         if preds.shape[0] > 0:
             # Compute IoU
             if self.use_polygons:
-                iou_mat = polygon_iou(gts, preds, self.mask_shape, self.use_broadcasting)
+                iou_mat = polygon_iou(gts, preds)
             else:
                 iou_mat = box_iou(gts, preds)
             self.tot_iou += float(iou_mat.max(axis=0).sum())
@@ -409,13 +285,12 @@ class LocalizationConfusion:
         self.num_gts += gts.shape[0]
         self.num_preds += preds.shape[0]
 
-    def summary(self) -> Tuple[Optional[float], Optional[float], Optional[float]]:
+    def summary(self) -> tuple[float | None, float | None, float | None]:
         """Computes the aggregated metrics
 
         Returns:
             a tuple with the recall, precision and meanIoU scores
         """
-
         # Recall
         recall = self.matches / self.num_gts if self.num_gts > 0 else None
 
@@ -423,7 +298,7 @@ class LocalizationConfusion:
         precision = self.matches / self.num_preds if self.num_preds > 0 else None
 
         # mean IoU
-        mean_iou = self.tot_iou / self.num_preds if self.num_preds > 0 else None
+        mean_iou = round(self.tot_iou / self.num_preds, 2) if self.num_preds > 0 else None
 
         return recall, precision, mean_iou
 
@@ -431,7 +306,7 @@ class LocalizationConfusion:
         self.num_gts = 0
         self.num_preds = 0
         self.matches = 0
-        self.tot_iou = 0.
+        self.tot_iou = 0.0
 
 
 class OCRMetric:
@@ -473,29 +348,23 @@ class OCRMetric:
     Args:
         iou_thresh: minimum IoU to consider a pair of prediction and ground truth as a match
         use_polygons: if set to True, predictions and targets will be expected to have rotated format
-        mask_shape: if use_polygons is True, describes the spatial shape of the image used
-        use_broadcasting: if use_polygons is True, use broadcasting for IoU computation by consuming more memory
     """
 
     def __init__(
         self,
         iou_thresh: float = 0.5,
         use_polygons: bool = False,
-        mask_shape: Tuple[int, int] = (1024, 1024),
-        use_broadcasting: bool = True,
     ) -> None:
         self.iou_thresh = iou_thresh
         self.use_polygons = use_polygons
-        self.mask_shape = mask_shape
-        self.use_broadcasting = use_broadcasting
         self.reset()
 
     def update(
         self,
         gt_boxes: np.ndarray,
         pred_boxes: np.ndarray,
-        gt_labels: List[str],
-        pred_labels: List[str],
+        gt_labels: list[str],
+        pred_labels: list[str],
     ) -> None:
         """Updates the metric
 
@@ -505,15 +374,15 @@ class OCRMetric:
             gt_labels: a list of N string labels
             pred_labels: a list of M string labels
         """
-
         if gt_boxes.shape[0] != len(gt_labels) or pred_boxes.shape[0] != len(pred_labels):
-            raise AssertionError("there should be the same number of boxes and string both for the ground truth "
-                                 "and the predictions")
+            raise AssertionError(
+                "there should be the same number of boxes and string both for the ground truth and the predictions"
+            )
 
         # Compute IoU
         if pred_boxes.shape[0] > 0:
             if self.use_polygons:
-                iou_mat = polygon_iou(gt_boxes, pred_boxes, self.mask_shape, self.use_broadcasting)
+                iou_mat = polygon_iou(gt_boxes, pred_boxes)
             else:
                 iou_mat = box_iou(gt_boxes, pred_boxes)
 
@@ -524,27 +393,26 @@ class OCRMetric:
             is_kept = iou_mat[gt_indices, pred_indices] >= self.iou_thresh
             # String comparison
             for gt_idx, pred_idx in zip(gt_indices[is_kept], pred_indices[is_kept]):
-                _raw, _caseless, _unidecode, _unicase = string_match(gt_labels[gt_idx], pred_labels[pred_idx])
+                _raw, _caseless, _anyascii, _unicase = string_match(gt_labels[gt_idx], pred_labels[pred_idx])
                 self.raw_matches += int(_raw)
                 self.caseless_matches += int(_caseless)
-                self.unidecode_matches += int(_unidecode)
+                self.anyascii_matches += int(_anyascii)
                 self.unicase_matches += int(_unicase)
 
         self.num_gts += gt_boxes.shape[0]
         self.num_preds += pred_boxes.shape[0]
 
-    def summary(self) -> Tuple[Dict[str, Optional[float]], Dict[str, Optional[float]], Optional[float]]:
+    def summary(self) -> tuple[dict[str, float | None], dict[str, float | None], float | None]:
         """Computes the aggregated metrics
 
         Returns:
             a tuple with the recall & precision for each string comparison and the mean IoU
         """
-
         # Recall
         recall = dict(
             raw=self.raw_matches / self.num_gts if self.num_gts > 0 else None,
             caseless=self.caseless_matches / self.num_gts if self.num_gts > 0 else None,
-            unidecode=self.unidecode_matches / self.num_gts if self.num_gts > 0 else None,
+            anyascii=self.anyascii_matches / self.num_gts if self.num_gts > 0 else None,
             unicase=self.unicase_matches / self.num_gts if self.num_gts > 0 else None,
         )
 
@@ -552,22 +420,22 @@ class OCRMetric:
         precision = dict(
             raw=self.raw_matches / self.num_preds if self.num_preds > 0 else None,
             caseless=self.caseless_matches / self.num_preds if self.num_preds > 0 else None,
-            unidecode=self.unidecode_matches / self.num_preds if self.num_preds > 0 else None,
+            anyascii=self.anyascii_matches / self.num_preds if self.num_preds > 0 else None,
             unicase=self.unicase_matches / self.num_preds if self.num_preds > 0 else None,
         )
 
         # mean IoU (overall detected boxes)
-        mean_iou = self.tot_iou / self.num_preds if self.num_preds > 0 else None
+        mean_iou = round(self.tot_iou / self.num_preds, 2) if self.num_preds > 0 else None
 
         return recall, precision, mean_iou
 
     def reset(self) -> None:
         self.num_gts = 0
         self.num_preds = 0
-        self.tot_iou = 0.
+        self.tot_iou = 0.0
         self.raw_matches = 0
         self.caseless_matches = 0
-        self.unidecode_matches = 0
+        self.anyascii_matches = 0
         self.unicase_matches = 0
 
 
@@ -610,21 +478,15 @@ class DetectionMetric:
     Args:
         iou_thresh: minimum IoU to consider a pair of prediction and ground truth as a match
         use_polygons: if set to True, predictions and targets will be expected to have rotated format
-        mask_shape: if use_polygons is True, describes the spatial shape of the image used
-        use_broadcasting: if use_polygons is True, use broadcasting for IoU computation by consuming more memory
     """
 
     def __init__(
         self,
         iou_thresh: float = 0.5,
         use_polygons: bool = False,
-        mask_shape: Tuple[int, int] = (1024, 1024),
-        use_broadcasting: bool = True,
     ) -> None:
         self.iou_thresh = iou_thresh
         self.use_polygons = use_polygons
-        self.mask_shape = mask_shape
-        self.use_broadcasting = use_broadcasting
         self.reset()
 
     def update(
@@ -642,15 +504,15 @@ class DetectionMetric:
             gt_labels: an array of class indices of shape (N,)
             pred_labels: an array of class indices of shape (M,)
         """
-
         if gt_boxes.shape[0] != gt_labels.shape[0] or pred_boxes.shape[0] != pred_labels.shape[0]:
-            raise AssertionError("there should be the same number of boxes and string both for the ground truth "
-                                 "and the predictions")
+            raise AssertionError(
+                "there should be the same number of boxes and string both for the ground truth and the predictions"
+            )
 
         # Compute IoU
         if pred_boxes.shape[0] > 0:
             if self.use_polygons:
-                iou_mat = polygon_iou(gt_boxes, pred_boxes, self.mask_shape, self.use_broadcasting)
+                iou_mat = polygon_iou(gt_boxes, pred_boxes)
             else:
                 iou_mat = box_iou(gt_boxes, pred_boxes)
 
@@ -665,13 +527,12 @@ class DetectionMetric:
         self.num_gts += gt_boxes.shape[0]
         self.num_preds += pred_boxes.shape[0]
 
-    def summary(self) -> Tuple[Optional[float], Optional[float], Optional[float]]:
+    def summary(self) -> tuple[float | None, float | None, float | None]:
         """Computes the aggregated metrics
 
         Returns:
             a tuple with the recall & precision for each class prediction and the mean IoU
         """
-
         # Recall
         recall = self.num_matches / self.num_gts if self.num_gts > 0 else None
 
@@ -679,12 +540,12 @@ class DetectionMetric:
         precision = self.num_matches / self.num_preds if self.num_preds > 0 else None
 
         # mean IoU (overall detected boxes)
-        mean_iou = self.tot_iou / self.num_preds if self.num_preds > 0 else None
+        mean_iou = round(self.tot_iou / self.num_preds, 2) if self.num_preds > 0 else None
 
         return recall, precision, mean_iou
 
     def reset(self) -> None:
         self.num_gts = 0
         self.num_preds = 0
-        self.tot_iou = 0.
+        self.tot_iou = 0.0
         self.num_matches = 0

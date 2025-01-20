@@ -1,16 +1,15 @@
-# Copyright (C) 2021-2022, Mindee.
+# Copyright (C) 2021-2025, Mindee.
 
-# This program is licensed under the Apache License version 2.
-# See LICENSE or go to <https://www.apache.org/licenses/LICENSE-2.0.txt> for full license details.
+# This program is licensed under the Apache License 2.0.
+# See LICENSE or go to <https://opensource.org/licenses/Apache-2.0> for full license details.
 
-from typing import List
 
 import cv2
 import numpy as np
 
 from doctr.utils.repr import NestedObject
 
-__all__ = ['DetectionPostProcessor']
+__all__ = ["DetectionPostProcessor"]
 
 
 class DetectionPostProcessor(NestedObject):
@@ -22,31 +21,23 @@ class DetectionPostProcessor(NestedObject):
         assume straight_pages (bool): if True, fit straight boxes only
     """
 
-    def __init__(
-        self,
-        box_thresh: float = 0.5,
-        bin_thresh: float = 0.5,
-        assume_straight_pages: bool = True
-    ) -> None:
-
+    def __init__(self, box_thresh: float = 0.5, bin_thresh: float = 0.5, assume_straight_pages: bool = True) -> None:
         self.box_thresh = box_thresh
         self.bin_thresh = bin_thresh
         self.assume_straight_pages = assume_straight_pages
-        self._opening_kernel = np.ones((3, 3), dtype=np.uint8)
+        self._opening_kernel: np.ndarray = np.ones((3, 3), dtype=np.uint8)
 
     def extra_repr(self) -> str:
         return f"bin_thresh={self.bin_thresh}, box_thresh={self.box_thresh}"
 
     @staticmethod
-    def box_score(
-        pred: np.ndarray,
-        points: np.ndarray,
-        assume_straight_pages: bool = True
-    ) -> float:
+    def box_score(pred: np.ndarray, points: np.ndarray, assume_straight_pages: bool = True) -> float:
         """Compute the confidence score for a polygon : mean of the p values on the polygon
 
         Args:
             pred (np.ndarray): p map returned by the model
+            points: coordinates of the polygon
+            assume_straight_pages: if True, fit straight boxes only
 
         Returns:
             polygon objectness
@@ -58,11 +49,11 @@ class DetectionPostProcessor(NestedObject):
             xmax = np.clip(np.ceil(points[:, 0].max()).astype(np.int32), 0, w - 1)
             ymin = np.clip(np.floor(points[:, 1].min()).astype(np.int32), 0, h - 1)
             ymax = np.clip(np.ceil(points[:, 1].max()).astype(np.int32), 0, h - 1)
-            return pred[ymin:ymax + 1, xmin:xmax + 1].mean()
+            return pred[ymin : ymax + 1, xmin : xmax + 1].mean()
 
         else:
-            mask = np.zeros((h, w), np.int32)
-            cv2.fillPoly(mask, [points.astype(np.int32)], 1.0)
+            mask: np.ndarray = np.zeros((h, w), np.int32)
+            cv2.fillPoly(mask, [points.astype(np.int32)], 1.0)  # type: ignore[call-overload]
             product = pred * mask
             return np.sum(product) / np.count_nonzero(product)
 
@@ -76,7 +67,7 @@ class DetectionPostProcessor(NestedObject):
     def __call__(
         self,
         proba_map,
-    ) -> List[List[np.ndarray]]:
+    ) -> list[list[np.ndarray]]:
         """Performs postprocessing for a list of model outputs
 
         Args:
@@ -86,7 +77,6 @@ class DetectionPostProcessor(NestedObject):
             list of N class predictions (for each input sample), where each class predictions is a list of C tensors
         of shape (*, 5) or (*, 6)
         """
-
         if proba_map.ndim != 4:
             raise AssertionError(f"arg `proba_map` is expected to be 4-dimensional, got {proba_map.ndim}.")
 

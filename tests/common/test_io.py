@@ -1,4 +1,5 @@
 from io import BytesIO
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -9,7 +10,7 @@ from doctr import io
 
 def _check_doc_content(doc_tensors, num_pages):
     # 1 doc of 8 pages
-    assert(len(doc_tensors) == num_pages)
+    assert len(doc_tensors) == num_pages
     assert all(isinstance(page, np.ndarray) for page in doc_tensors)
     assert all(page.dtype == np.uint8 for page in doc_tensors)
 
@@ -18,7 +19,11 @@ def test_read_pdf(mock_pdf):
     doc = io.read_pdf(mock_pdf)
     _check_doc_content(doc, 2)
 
-    with open(mock_pdf, 'rb') as f:
+    # Test with Path
+    doc = io.read_pdf(Path(mock_pdf))
+    _check_doc_content(doc, 2)
+
+    with open(mock_pdf, "rb") as f:
         doc = io.read_pdf(f.read())
     _check_doc_content(doc, 2)
 
@@ -32,7 +37,6 @@ def test_read_pdf(mock_pdf):
 
 
 def test_read_img_as_numpy(tmpdir_factory, mock_pdf):
-
     # Wrong input type
     with pytest.raises(TypeError):
         _ = io.read_img_as_numpy(123)
@@ -46,14 +50,14 @@ def test_read_img_as_numpy(tmpdir_factory, mock_pdf):
         io.read_img_as_numpy(str(mock_pdf))
 
     # From path
-    url = 'https://github.com/mindee/doctr/releases/download/v0.2.1/Grace_Hopper.jpg'
+    url = "https://doctr-static.mindee.com/models?id=v0.2.1/Grace_Hopper.jpg&src=0"
     file = BytesIO(requests.get(url).content)
     tmp_path = str(tmpdir_factory.mktemp("data").join("mock_img_file.jpg"))
-    with open(tmp_path, 'wb') as f:
+    with open(tmp_path, "wb") as f:
         f.write(file.getbuffer())
 
     # Path & stream
-    with open(tmp_path, 'rb') as f:
+    with open(tmp_path, "rb") as f:
         page_stream = io.read_img_as_numpy(f.read())
 
     for page in (io.read_img_as_numpy(tmp_path), page_stream):
@@ -88,7 +92,6 @@ def test_document_file(mock_pdf, mock_image_stream):
 
 
 def test_pdf(mock_pdf):
-
     pages = io.DocumentFile.from_pdf(mock_pdf)
 
     # As images

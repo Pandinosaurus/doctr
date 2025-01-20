@@ -1,33 +1,32 @@
-# Copyright (C) 2021-2022, Mindee.
+# Copyright (C) 2021-2025, Mindee.
 
-# This program is licensed under the Apache License version 2.
-# See LICENSE or go to <https://www.apache.org/licenses/LICENSE-2.0.txt> for full license details.
-
+# This program is licensed under the Apache License 2.0.
+# See LICENSE or go to <https://opensource.org/licenses/Apache-2.0> for full license details.
 
 import math
 from copy import deepcopy
 from functools import partial
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import tensorflow as tf
-from tensorflow.keras import layers
+from tensorflow.keras import activations, layers
 from tensorflow.keras.models import Sequential
 
 from doctr.datasets import VOCABS
 
-from ...utils import load_pretrained_params
+from ...utils import _build_model, load_pretrained_params
 from ..resnet.tensorflow import ResNet
 
-__all__ = ['magc_resnet31']
+__all__ = ["magc_resnet31"]
 
 
-default_cfgs: Dict[str, Dict[str, Any]] = {
-    'magc_resnet31': {
-        'mean': (0.5, 0.5, 0.5),
-        'std': (1., 1., 1.),
-        'input_shape': (32, 32, 3),
-        'classes': list(VOCABS['french']),
-        'url': None,
+default_cfgs: dict[str, dict[str, Any]] = {
+    "magc_resnet31": {
+        "mean": (0.694, 0.695, 0.693),
+        "std": (0.299, 0.296, 0.301),
+        "input_shape": (32, 32, 3),
+        "classes": list(VOCABS["french"]),
+        "url": "https://doctr-static.mindee.com/models?id=v0.9.0/magc_resnet31-16aa7d71.weights.h5&src=0",
     },
 }
 
@@ -50,39 +49,28 @@ class MAGC(layers.Layer):
         headers: int = 8,
         attn_scale: bool = False,
         ratio: float = 0.0625,  # bottleneck ratio of 1/16 as described in paper
-        **kwargs
+        **kwargs,
     ) -> None:
         super().__init__(**kwargs)
 
         self.headers = headers  # h
         self.inplanes = inplanes  # C
         self.attn_scale = attn_scale
+        self.ratio = ratio
         self.planes = int(inplanes * ratio)
 
         self.single_header_inplanes = int(inplanes / headers)  # C / h
 
-        self.conv_mask = layers.Conv2D(
-            filters=1,
-            kernel_size=1,
-            kernel_initializer=tf.initializers.he_normal()
-        )
+        self.conv_mask = layers.Conv2D(filters=1, kernel_size=1, kernel_initializer=tf.initializers.he_normal())
 
         self.transform = Sequential(
             [
-                layers.Conv2D(
-                    filters=self.planes,
-                    kernel_size=1,
-                    kernel_initializer=tf.initializers.he_normal()
-                ),
+                layers.Conv2D(filters=self.planes, kernel_size=1, kernel_initializer=tf.initializers.he_normal()),
                 layers.LayerNormalization([1, 2, 3]),
                 layers.ReLU(),
-                layers.Conv2D(
-                    filters=self.inplanes,
-                    kernel_size=1,
-                    kernel_initializer=tf.initializers.he_normal()
-                ),
+                layers.Conv2D(filters=self.inplanes, kernel_size=1, kernel_initializer=tf.initializers.he_normal()),
             ],
-            name='transform'
+            name="transform",
         )
 
     def context_modeling(self, inputs: tf.Tensor) -> tf.Tensor:
@@ -109,7 +97,7 @@ class MAGC(layers.Layer):
         if self.attn_scale and self.headers > 1:
             context_mask = context_mask / math.sqrt(self.single_header_inplanes)
         # B*h, 1, H*W, 1
-        context_mask = tf.keras.activations.softmax(context_mask, axis=2)
+        context_mask = activations.softmax(context_mask, axis=2)
 
         # Compute context
         # B*h, 1, C/h, 1
@@ -126,31 +114,30 @@ class MAGC(layers.Layer):
         # Context modeling: B, H, W, C  ->  B, 1, 1, C
         context = self.context_modeling(inputs)
         # Transform: B, 1, 1, C  ->  B, 1, 1, C
-        transformed = self.transform(context)
+        transformed = self.transform(context, **kwargs)
         return inputs + transformed
 
 
 def _magc_resnet(
     arch: str,
     pretrained: bool,
-    num_blocks: List[int],
-    output_channels: List[int],
-    stage_downsample: List[bool],
-    stage_conv: List[bool],
-    stage_pooling: List[Optional[Tuple[int, int]]],
+    num_blocks: list[int],
+    output_channels: list[int],
+    stage_downsample: list[bool],
+    stage_conv: list[bool],
+    stage_pooling: list[tuple[int, int] | None],
     origin_stem: bool = True,
     **kwargs: Any,
 ) -> ResNet:
-
-    kwargs['num_classes'] = kwargs.get("num_classes", len(default_cfgs[arch]['classes']))
-    kwargs['input_shape'] = kwargs.get("input_shape", default_cfgs[arch]['input_shape'])
-    kwargs['classes'] = kwargs.get('classes', default_cfgs[arch]['classes'])
+    kwargs["num_classes"] = kwargs.get("num_classes", len(default_cfgs[arch]["classes"]))
+    kwargs["input_shape"] = kwargs.get("input_shape", default_cfgs[arch]["input_shape"])
+    kwargs["classes"] = kwargs.get("classes", default_cfgs[arch]["classes"])
 
     _cfg = deepcopy(default_cfgs[arch])
-    _cfg['num_classes'] = kwargs['num_classes']
-    _cfg['classes'] = kwargs['classes']
-    _cfg['input_shape'] = kwargs['input_shape']
-    kwargs.pop('classes')
+    _cfg["num_classes"] = kwargs["num_classes"]
+    _cfg["classes"] = kwargs["classes"]
+    _cfg["input_shape"] = kwargs["input_shape"]
+    kwargs.pop("classes")
 
     # Build the model
     model = ResNet(
@@ -164,9 +151,15 @@ def _magc_resnet(
         cfg=_cfg,
         **kwargs,
     )
+    _build_model(model)
+
     # Load pretrained parameters
     if pretrained:
-        load_pretrained_params(model, default_cfgs[arch]['url'])
+        # The number of classes is not the same as the number of classes in the pretrained model =>
+        # skip the mismatching layers for fine tuning
+        load_pretrained_params(
+            model, default_cfgs[arch]["url"], skip_mismatch=kwargs["num_classes"] != len(default_cfgs[arch]["classes"])
+        )
 
     return model
 
@@ -184,13 +177,13 @@ def magc_resnet31(pretrained: bool = False, **kwargs: Any) -> ResNet:
 
     Args:
         pretrained: boolean, True if model is pretrained
+        **kwargs: keyword arguments of the ResNet architecture
 
     Returns:
         A feature extractor model
     """
-
     return _magc_resnet(
-        'magc_resnet31',
+        "magc_resnet31",
         pretrained,
         [1, 2, 5, 3],
         [256, 256, 512, 512],

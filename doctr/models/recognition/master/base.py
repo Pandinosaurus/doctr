@@ -1,9 +1,8 @@
-# Copyright (C) 2021-2022, Mindee.
+# Copyright (C) 2021-2025, Mindee.
 
-# This program is licensed under the Apache License version 2.
-# See LICENSE or go to <https://www.apache.org/licenses/LICENSE-2.0.txt> for full license details.
+# This program is licensed under the Apache License 2.0.
+# See LICENSE or go to <https://opensource.org/licenses/Apache-2.0> for full license details.
 
-from typing import List, Tuple
 
 import numpy as np
 
@@ -12,14 +11,13 @@ from ..core import RecognitionPostProcessor
 
 
 class _MASTER:
-
     vocab: str
     max_length: int
 
     def build_target(
         self,
-        gts: List[str],
-    ) -> Tuple[np.ndarray, List[int]]:
+        gts: list[str],
+    ) -> tuple[np.ndarray, list[int]]:
         """Encode a list of gts sequences into a np array and gives the corresponding*
         sequence lengths.
 
@@ -52,6 +50,5 @@ class _MASTERPostProcessor(RecognitionPostProcessor):
         self,
         vocab: str,
     ) -> None:
-
         super().__init__(vocab)
-        self._embedding = list(vocab) + ['<eos>'] + ['<sos>'] + ['<pad>']
+        self._embedding = list(vocab) + ["<eos>"] + ["<sos>"] + ["<pad>"]

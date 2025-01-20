@@ -1,5 +1,9 @@
-"""
-Borrowed & adapted from https://github.com/pytorch/vision/blob/main/.github/process_commit.py
+# Copyright (C) 2021-2025, Mindee.
+
+# This program is licensed under the Apache License 2.0.
+# See LICENSE or go to <https://opensource.org/licenses/Apache-2.0> for full license details.
+
+"""Borrowed & adapted from https://github.com/pytorch/vision/blob/main/.github/process_commit.py
 This script finds the merger responsible for labeling a PR by a commit SHA. It is used by the workflow in
 '.github/workflows/pr-labels.yml'. If there exists no PR associated with the commit or the PR is properly labeled,
 this script is a no-op.
@@ -7,7 +11,7 @@ Note: we ping the merger only, not the reviewers, as the reviewers can sometimes
 with no labeling responsibility, so we don't want to bother them.
 """
 
-from typing import Any, Set, Tuple
+from typing import Any
 
 import requests
 
@@ -41,8 +45,8 @@ SECONDARY_LABELS = {
     "topic: docker",
 }
 
-GH_ORG = 'mindee'
-GH_REPO = 'doctr'
+GH_ORG = "mindee"
+GH_REPO = "doctr"
 
 
 def query_repo(cmd: str, *, accept) -> Any:
@@ -50,7 +54,7 @@ def query_repo(cmd: str, *, accept) -> Any:
     return response.json()
 
 
-def get_pr_merger_and_labels(pr_number: int) -> Tuple[str, Set[str]]:
+def get_pr_merger_and_labels(pr_number: int) -> tuple[str, set[str]]:
     # See https://docs.github.com/en/rest/reference/pulls#get-a-pull-request
     data = query_repo(f"pulls/{pr_number}", accept="application/vnd.github.v3+json")
     merger = data.get("merged_by", {}).get("login")
@@ -67,10 +71,12 @@ def main(args):
 
 def parse_args():
     import argparse
-    parser = argparse.ArgumentParser(description='PR label checker',
-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument('pr', type=int, help='PR number')
+    parser = argparse.ArgumentParser(
+        description="PR label checker", formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+
+    parser.add_argument("pr", type=int, help="PR number")
     args = parser.parse_args()
 
     return args
